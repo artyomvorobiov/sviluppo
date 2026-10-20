@@ -1,7 +1,7 @@
 import Foundation
 
 /// Одна рекомендация: фильм, альбом, картина или статья.
-/// Формат JSON описан в content/README.md — он же пригодится для версии под Android.
+/// Формат JSON описан в docs/catalog.md — он же пригодится для версии под Android.
 struct Item: Codable, Identifiable, Hashable {
     /// Уникальный идентификатор: латиница, цифры и дефис ("painting-hunters-in-the-snow").
     var id: String

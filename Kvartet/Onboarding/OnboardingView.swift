@@ -79,7 +79,17 @@ struct OnboardingView: View {
             .padding(.horizontal, 24)
             .padding(.top, 12)
             .padding(.bottom, 8)
-            .background(Theme.paper)
+            .background {
+                // Текст, уходящий под кнопку, плавно растворяется.
+                Theme.paper
+                    .overlay(alignment: .top) {
+                        LinearGradient(colors: [Theme.paper.opacity(0), Theme.paper], startPoint: .top, endPoint: .bottom)
+                            .frame(height: 28)
+                            .offset(y: -28)
+                            .allowsHitTesting(false)
+                    }
+                    .ignoresSafeArea(edges: .bottom)
+            }
         }
         .interactiveDismissDisabled()
     }
