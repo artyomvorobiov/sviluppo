@@ -272,7 +272,12 @@ actor MediaResolver {
     }
 
     private static func titles(of item: Item) -> [String] {
-        [item.originalTitle, item.title].compactMap { $0 }
+        var titles = [item.originalTitle, item.title].compactMap { $0 }
+        // У фильмов в поле search — международное название для iTunes («Babette's Feast»).
+        if item.kind == .film, let search = item.search {
+            titles.insert(search, at: 0)
+        }
+        return titles
     }
 
     private static func iTunesAlbum(_ item: Item) async -> Match {

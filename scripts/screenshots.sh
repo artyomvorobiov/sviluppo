@@ -43,10 +43,12 @@ shot() {
   echo "📸 $1"
 }
 
+# Перезапуск приложения сразу на нужном экране (аргумент -openURL работает в Debug-сборке;
+# simctl openurl для своей схемы показывает системный вопрос «Открыть в …?»).
 relaunch_with() {
   xcrun simctl terminate "$UDID" "$BUNDLE" >/dev/null 2>&1 || true
   sleep 1
-  xcrun simctl openurl "$UDID" "$1"
+  xcrun simctl launch "$UDID" "$BUNDLE" -skipOnboarding -openURL "$1" >/dev/null
 }
 
 # Первый запуск — приветственный экран.
@@ -75,14 +77,17 @@ done <<'EOF'
 11-film-2 kvartet://item/film-fargo 10
 12-archive kvartet://archive 5
 13-journal kvartet://journal 5
+14-settings kvartet://settings 5
 EOF
 
 # Тёмная тема.
 xcrun simctl ui "$UDID" appearance dark
 relaunch_with "kvartet://today"
-shot 14-today-dark 10
+shot 15-today-dark 10
 relaunch_with "kvartet://item/painting-hunters-in-the-snow"
-shot 15-painting-dark 12
+shot 16-painting-dark 12
+relaunch_with "kvartet://item/painting-hunters-in-the-snow?open=zoom"
+shot 17-zoom-dark 10
 
 # Уменьшаем и сохраняем в JPEG, чтобы не раздувать репозиторий.
 for file in "$RAW"/*.png; do

@@ -69,7 +69,10 @@ extension Item {
     }
 
     var articleURL: URL? {
-        url.flatMap { URL(string: $0) }
+        guard let url else { return nil }
+        if let direct = URL(string: url) { return direct }
+        // Кириллица и «ёлочки» в адресах Википедии: кодируем, если система не сделала этого сама.
+        return url.addingPercentEncoding(withAllowedCharacters: .urlFragmentAllowed).flatMap { URL(string: $0) }
     }
 
     /// Страница Википедии из поля `wiki`.

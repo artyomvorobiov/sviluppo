@@ -8,7 +8,6 @@ struct IssueView: View {
 
     @Environment(AppModel.self) private var model
     @Environment(Preferences.self) private var prefs
-    @State private var showSettings = false
 
     var body: some View {
         let issue = model.issue(for: date)
@@ -52,7 +51,7 @@ struct IssueView: View {
             if isToday {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
-                        showSettings = true
+                        model.isSettingsPresented = true
                     } label: {
                         Image(systemName: "gearshape")
                     }
@@ -60,12 +59,20 @@ struct IssueView: View {
                 }
             }
         }
-        .sheet(isPresented: $showSettings) {
+        .sheet(isPresented: settingsBinding) {
             SettingsView()
                 .environment(model)
                 .environment(prefs)
         }
         .sensoryFeedback(.success, trigger: doneCount) { old, new in new > old }
+    }
+
+    /// Настройки открываются только с экрана «Сегодня».
+    private var settingsBinding: Binding<Bool> {
+        Binding(
+            get: { isToday && model.isSettingsPresented },
+            set: { model.isSettingsPresented = $0 }
+        )
     }
 }
 

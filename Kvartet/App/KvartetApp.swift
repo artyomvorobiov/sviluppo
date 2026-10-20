@@ -22,6 +22,8 @@ struct KvartetApp: App {
             RootView()
                 .environment(model)
                 .environment(prefs)
+                // Системные элементы (выбор времени и т. п.) — по-русски, как и весь интерфейс.
+                .environment(\.locale, Format.russian)
         }
     }
 }

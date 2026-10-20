@@ -11,8 +11,6 @@ struct OnboardingView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 28) {
-                Spacer(minLength: 24)
-
                 VStack(alignment: .leading, spacing: 12) {
                     QuartetMark()
                         .frame(width: 56, height: 56)
@@ -58,23 +56,31 @@ struct OnboardingView: View {
                 }
                 .padding(.horizontal, 16)
                 .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Theme.card))
-
-                Button {
-                    finish()
-                } label: {
-                    if isFinishing {
-                        ProgressView().tint(Theme.paper)
-                    } else {
-                        Text("Начать")
-                    }
-                }
-                .buttonStyle(FilledButtonStyle())
-                .disabled(isFinishing)
             }
-            .padding(24)
+            .padding(.horizontal, 24)
+            .padding(.top, 48)
+            .padding(.bottom, 24)
         }
         .scrollIndicators(.hidden)
         .background(Theme.paper.ignoresSafeArea())
+        // Кнопка всегда видна, даже на маленьком экране.
+        .safeAreaInset(edge: .bottom) {
+            Button {
+                finish()
+            } label: {
+                if isFinishing {
+                    ProgressView().tint(Theme.paper)
+                } else {
+                    Text("Начать")
+                }
+            }
+            .buttonStyle(FilledButtonStyle())
+            .disabled(isFinishing)
+            .padding(.horizontal, 24)
+            .padding(.top, 12)
+            .padding(.bottom, 8)
+            .background(Theme.paper)
+        }
         .interactiveDismissDisabled()
     }
 

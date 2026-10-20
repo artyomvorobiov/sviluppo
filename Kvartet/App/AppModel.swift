@@ -25,6 +25,7 @@ final class AppModel {
     /// Что сразу открыть на экране рекомендации после перехода по ссылке
     /// (kvartet://item/<id>?open=reader|look|zoom).
     var pendingOpen: PendingOpen?
+    var isSettingsPresented = false
 
     private let store = UserStateStore.shared
     @ObservationIgnored private var lastRemoteCheck: Date?
@@ -33,6 +34,14 @@ final class AppModel {
         library = ContentLibrary.load()
         today = Date()
         state = UserStateStore.shared.ensureStartDay()
+        #if DEBUG
+        // Для автоматических скриншотов: запуск с аргументами -openURL kvartet://…
+        let arguments = ProcessInfo.processInfo.arguments
+        if let index = arguments.firstIndex(of: "-openURL"), index + 1 < arguments.count,
+           let url = URL(string: arguments[index + 1]) {
+            handle(url: url)
+        }
+        #endif
     }
 
     // MARK: - Дни и выпуски
@@ -214,7 +223,7 @@ final class AppModel {
 
     // MARK: - Ссылки kvartet://
 
-    /// kvartet://today, kvartet://archive, kvartet://journal,
+    /// kvartet://today, kvartet://archive, kvartet://journal, kvartet://settings,
     /// kvartet://item/<id> и kvartet://item/<id>?open=reader|look|zoom.
     func handle(url: URL) {
         guard url.scheme == AppConfig.urlScheme else { return }
@@ -234,6 +243,10 @@ final class AppModel {
         case "journal":
             selectedTab = .journal
             journalPath = []
+        case "settings":
+            selectedTab = .today
+            todayPath = []
+            isSettingsPresented = true
         default:
             selectedTab = .today
             todayPath = []
