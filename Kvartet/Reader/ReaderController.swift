@@ -8,7 +8,7 @@ struct ParsedArticle: Codable, Equatable {
     var byline: String?
     var siteName: String?
     var content: String
-    /// Длина текста в символах.
+    /// Длина основного текста в символах (по ней считается время чтения).
     var length: Int
     var lang: String?
 }
@@ -376,12 +376,17 @@ final class ReaderController {
       }
     }
 
+    // Время чтения считаем по абзацам: сноски, таблицы и списки литературы почти никто не читает.
+    const paragraphs = Array.from(parsed.body.querySelectorAll("p"))
+      .reduce((sum, node) => sum + node.textContent.trim().length, 0);
+    const total = article.length || 0;
+
     return {
       title: article.title || "",
       byline: article.byline || "",
       siteName: article.siteName || "",
       content: parsed.body.innerHTML,
-      length: article.length || 0,
+      length: paragraphs > total * 0.3 ? paragraphs : total,
       lang: article.lang || document.documentElement.lang || ""
     };
     """
