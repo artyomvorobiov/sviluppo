@@ -1,0 +1,82 @@
+# Проверка, что приложение и виджет собираются (без подписи).
+# Запускается при каждом push и pull request, а также вручную (вкладка Actions → Run workflow).
+name: iOS build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ios-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  content:
+    name: Каталог
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Проверка catalog.json
+        run: python3 scripts/validate_catalog.py
+
+  build:
+    name: Сборка (${{ matrix.xcode }})
+    runs-on: macos-15
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        xcode: [default, newest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Выбор Xcode
+        run: |
+          ls -d /Applications/Xcode*.app || true
+          if [ "${{ matrix.xcode }}" = "newest" ]; then
+            XCODE=$(ls -d /Applications/Xcode_*.app | grep -viE 'beta|release_candidate|_rc' | sort -V | tail -1)
+            sudo xcode-select -s "$XCODE/Contents/Developer"
+          fi
+          xcode-select -p
+          xcodebuild -version
+          xcodebuild -showsdks | grep -i ios || true
+
+      - name: Сборка для симулятора
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project Kvartet.xcodeproj \
+            -scheme Kvartet \
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            | tee build-simulator.log \
+            | grep -E "error:|warning:|BUILD (SUCCEEDED|FAILED)" | grep -v "appintentsmetadataprocessor" || true
+          grep -q "BUILD SUCCEEDED" build-simulator.log
+
+      - name: Сборка для iPhone (Release, без подписи)
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project Kvartet.xcodeproj \
+            -scheme Kvartet \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            | tee build-device.log \
+            | grep -E "error:|BUILD (SUCCEEDED|FAILED)" || true
+          grep -q "BUILD SUCCEEDED" build-device.log
+
+      - name: Логи сборки
+        if: failure()
+        run: |
+          for f in build-simulator.log build-device.log; do
+            [ -f "$f" ] || continue
+            echo "===== $f (ошибки) ====="
+            grep -nE "error:|fatal|failed" "$f" | head -150 || true
+            echo "===== $f (конец) ====="
+            tail -80 "$f"
+          done

@@ -1,0 +1,27 @@
+// =====================================================================
+//  Квартет — настройки сборки, которые нужно поменять под себя
+// =====================================================================
+//
+//  1. BUNDLE_ID_PREFIX — уникальный «обратный домен», например com.ivanpetrov.
+//     Идентификатор приложения получится $(BUNDLE_ID_PREFIX).kvartet,
+//     виджета — $(BUNDLE_ID_PREFIX).kvartet.widget,
+//     общей группы (App Group) — group.$(BUNDLE_ID_PREFIX).kvartet.
+//     Apple требует, чтобы идентификатор был уникален среди всех разработчиков,
+//     поэтому com.example почти наверняка занят — замените его.
+//
+//  2. DEVELOPMENT_TEAM — Team ID вашей учётной записи Apple (10 символов).
+//     Можно оставить пустым и выбрать команду в Xcode:
+//     проект Kvartet → таргет → Signing & Capabilities → Team (для обоих таргетов).
+//
+// =====================================================================
+
+BUNDLE_ID_PREFIX = com.example
+DEVELOPMENT_TEAM =
+
+// --- Ниже обычно ничего менять не нужно -------------------------------
+
+APP_BUNDLE_ID = $(BUNDLE_ID_PREFIX).kvartet
+APP_GROUP_ID = group.$(BUNDLE_ID_PREFIX).kvartet
+
+MARKETING_VERSION = 1.0
+CURRENT_PROJECT_VERSION = 1
