@@ -19,7 +19,9 @@ jobs:
           code, query = sys.argv[1], sys.argv[2]
           try:
               d = json.load(open("r.json"))
-              names = [f'{r.get("artistName")} — {r.get("collectionName") or r.get("trackName")} ({(r.get("releaseDate") or "")[:4]}, {r.get("kind") or r.get("wrapperType")})' for r in d["results"][:4]]
+              rows = d["results"]
+              interesting = [r for r in rows if r.get("kind") == "feature-movie" or "emma" in (r.get("collectionName") or "").lower()]
+              names = [f'{r.get("kind") or r.get("wrapperType")}: {r.get("artistName")} — track={r.get("trackName")!r} collection={r.get("collectionName")!r} ({(r.get("releaseDate") or "")[:4]}) art={bool(r.get("artworkUrl100"))} preview={bool(r.get("previewUrl"))}' for r in (interesting or rows)[:6]]
               print(f"{code} | {d['resultCount']:>3} | {query}")
               for n in names:
                   print(f"           {n}")
@@ -28,21 +30,15 @@ jobs:
           EOF
             sleep 3
           }
-          probe "search?term=Fargo&media=movie&entity=movie&country=us&limit=5"
-          probe "search?term=fargo&media=movie&country=us&limit=5"
-          probe "search?term=Fargo&country=us&limit=5"
-          probe "search?term=Fargo%201996&media=movie&entity=movie&country=us&limit=5"
-          probe "search?term=Fargo&media=movie&entity=movie&attribute=movieTerm&country=us&limit=5"
-          probe "search?term=Coen&media=movie&entity=movie&attribute=directorTerm&country=us&limit=5"
-          probe "search?term=Into%20Great%20Silence&media=movie&entity=movie&country=us&limit=5"
-          probe "search?term=The%20Wind%20Rises&media=movie&entity=movie&country=us&limit=5"
-          probe "search?term=Psycho&media=movie&entity=movie&country=us&limit=5"
-          probe "search?term=Bon%20Iver%20For%20Emma%2C%20Forever%20Ago&media=music&entity=album&country=us&limit=5"
-          probe "search?term=Bon%20Iver%20For%20Emma%20Forever%20Ago&media=music&entity=album&country=us&limit=5"
-          probe "search?term=For%20Emma%2C%20Forever%20Ago&media=music&entity=album&country=us&limit=5"
-          probe "search?term=Bon%20Iver&media=music&entity=album&attribute=artistTerm&country=us&limit=5"
-          probe "search?term=Nils%20Frahm%20Felt&media=music&entity=album&country=us&limit=5"
-          probe "search?term=Bon%20Iver%20Skinny%20Love&media=music&entity=song&country=us&limit=5"
-          probe "search?term=Miles%20Davis%20Kind%20of%20Blue&media=music&entity=album&country=us&limit=5"
-          probe "search?term=Fargo&media=movie&entity=movie&country=gb&limit=5"
-          probe "search?term=%D0%A4%D0%B0%D1%80%D0%B3%D0%BE&media=movie&entity=movie&country=ru&limit=5"
+          probe "search?term=Fargo&entity=movie&country=us&limit=10"
+          probe "search?term=Fargo&media=all&entity=movie&country=us&limit=10"
+          probe "search?term=Fargo&country=us&limit=50"
+          probe "search?term=Psycho&country=us&limit=50"
+          probe "search?term=The%20Wind%20Rises&country=us&limit=50"
+          probe "search?term=Into%20Great%20Silence&country=us&limit=50"
+          probe "search?term=Metropolis&country=us&limit=50"
+          probe "search?term=Persona&country=us&limit=50"
+          probe "search?term=Bon%20Iver&media=music&entity=album&attribute=artistTerm&country=us&limit=200"
+          probe "search?term=For%20Emma%20Forever%20Ago%20Bon%20Iver&media=music&entity=album&country=us&limit=10"
+          probe "search?term=%D0%A4%D0%B0%D1%80%D0%B3%D0%BE&country=ru&limit=50"
+          probe "search?term=%D0%AF%20%D1%88%D0%B0%D0%B3%D0%B0%D1%8E%20%D0%BF%D0%BE%20%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D0%B5&country=ru&limit=50"
