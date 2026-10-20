@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// Находит изображения и фрагменты для рекомендаций без ключей API:
 /// • картины и статьи — свободные изображения Википедии (prop=pageimages отдаёт только свободные файлы);
@@ -32,6 +33,10 @@ actor MediaResolver {
         configuration.httpAdditionalHeaders = ["User-Agent": AppConfig.userAgent]
         return URLSession(configuration: configuration)
     }()
+
+    /// iTunes Search API пускает примерно 20 запросов в минуту с одного адреса.
+    private static let iTunesGate = RequestGate(spacing: 0.5, pauseAfterRefusal: 90)
+    private static let log = Logger(subsystem: "Kvartet", category: "media")
 
     // MARK: - Публичный интерфейс
 
@@ -259,8 +264,12 @@ actor MediaResolver {
             URLQueryItem(name: "country", value: country),
             URLQueryItem(name: "limit", value: "25")
         ]
-        guard let url = components?.url, let data = await get(url) else { return nil }
-        return (try? JSONDecoder().decode(ITunesResponse.self, from: data))?.results ?? []
+        guard let url = components?.url, let data = await get(url, gate: iTunesGate) else { return nil }
+        let results = (try? JSONDecoder().decode(ITunesResponse.self, from: data))?.results ?? []
+        if results.isEmpty {
+            log.notice("iTunes: nothing for «\(term, privacy: .public)» (\(entity, privacy: .public), \(country, privacy: .public))")
+        }
+        return results
     }
 
     private static func countries(for item: Item) -> [String] {
@@ -343,14 +352,57 @@ actor MediaResolver {
 
     // MARK: - Сеть
 
-    private static func get(_ url: URL) async -> Data? {
-        do {
-            let (data, response) = try await session.data(from: url)
-            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { return nil }
-            return data
-        } catch {
+    /// nil — ошибка сети или сервер отказал (тогда поиск повторится в следующий раз).
+    private static func get(_ url: URL, gate: RequestGate? = nil) async -> Data? {
+        if let gate, await !gate.enter() {
             return nil
         }
+        do {
+            let (data, response) = try await session.data(from: url)
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            guard status == 200 else {
+                log.error("HTTP \(status) for \(url.absoluteString, privacy: .public)")
+                if status == 403 || status == 429 {
+                    await gate?.pause()
+                }
+                return nil
+            }
+            return data
+        } catch {
+            log.error("\(error.localizedDescription, privacy: .public) for \(url.absoluteString, privacy: .public)")
+            return nil
+        }
+    }
+}
+
+/// Очередь запросов к сервису с ограничением частоты: запросы идут не чаще
+/// одного в `spacing` секунд, а после отказа (403/429) сервис какое-то время не беспокоим.
+actor RequestGate {
+    private let spacing: TimeInterval
+    private let pauseAfterRefusal: TimeInterval
+    private var nextSlot = Date.distantPast
+    private var pausedUntil = Date.distantPast
+
+    init(spacing: TimeInterval, pauseAfterRefusal: TimeInterval) {
+        self.spacing = spacing
+        self.pauseAfterRefusal = pauseAfterRefusal
+    }
+
+    /// Дожидается своей очереди. false — сервис просил подождать, запрос лучше не отправлять.
+    func enter() async -> Bool {
+        let now = Date()
+        guard now >= pausedUntil else { return false }
+        let slot = max(now, nextSlot)
+        nextSlot = slot.addingTimeInterval(spacing)
+        let wait = slot.timeIntervalSince(now)
+        if wait > 0 {
+            try? await Task.sleep(nanoseconds: UInt64(wait * 1_000_000_000))
+        }
+        return Date() >= pausedUntil
+    }
+
+    func pause() {
+        pausedUntil = Date().addingTimeInterval(pauseAfterRefusal)
     }
 }
 

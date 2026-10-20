@@ -7,6 +7,7 @@ set -euo pipefail
 APP="$1"
 OUT="$2"
 mkdir -p "$OUT"
+rm -f "$OUT"/*.jpg
 RAW="$(mktemp -d)"
 
 BUNDLE=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$APP/Info.plist")
@@ -36,6 +37,10 @@ xcrun simctl ui "$UDID" appearance light
 xcrun simctl status_bar "$UDID" override --time "9:41" --batteryState charged --batteryLevel 100 \
   --wifiBars 3 --cellularMode active --cellularBars 4 || true
 xcrun simctl install "$UDID" "$APP"
+
+# Журнал приложения (ошибки сети, ненайденные обложки) — печатается в конце.
+xcrun simctl spawn "$UDID" log stream --level info --predicate 'subsystem == "Kvartet"' >"$RAW/app.log" 2>&1 &
+LOG_PID=$!
 
 shot() {
   sleep "$2"
@@ -95,3 +100,7 @@ for file in "$RAW"/*.png; do
   sips -Z 1400 -s format jpeg -s formatOptions 80 "$file" --out "$OUT/$base.jpg" >/dev/null
 done
 ls -la "$OUT"
+
+kill "$LOG_PID" >/dev/null 2>&1 || true
+echo "--- Журнал приложения ---"
+tail -n 200 "$RAW/app.log" || true

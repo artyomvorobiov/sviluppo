@@ -6,8 +6,8 @@ enum ReaderTemplate {
         // Название из каталога аккуратнее, чем <title> страницы («… — Википедия»).
         let title = escape(item?.title ?? article.title)
         var meta: [String] = []
-        if let site = article.siteName ?? item?.source, !site.isEmpty { meta.append(escape(site)) }
-        if let byline = article.byline, !byline.isEmpty { meta.append(escape(byline)) }
+        if let site = article.siteName(for: item) { meta.append(escape(site)) }
+        if let byline = article.author { meta.append(escape(byline)) }
         if let minutes { meta.append("\(minutes) мин чтения") }
         let lang = escape(article.lang ?? "ru")
 
@@ -21,12 +21,12 @@ enum ReaderTemplate {
         <style>\(css)</style>
         </head>
         <body class="theme-\(theme.rawValue)">
-        <article>
+        <main class="reader">
         <p class="meta">\(meta.joined(separator: " · "))</p>
-        <h1>\(title)</h1>
+        <h1 class="title">\(title)</h1>
         <div class="content">\(article.content)</div>
         <p class="end">❦</p>
-        </article>
+        </main>
         </body>
         </html>
         """
@@ -54,9 +54,9 @@ enum ReaderTemplate {
     @media (prefers-color-scheme: dark) {
       body.theme-auto { --bg: #111113; --fg: #E8E5DF; --muted: #9C988F; --link: #E3B35A; --rule: rgba(255,255,255,.12); --code: rgba(255,255,255,.07); }
     }
-    article { max-width: 680px; margin: 0 auto; padding: 20px 22px 96px; }
+    .reader { max-width: 680px; margin: 0 auto; padding: 20px 22px 96px; }
     .meta { margin: 8px 0 0; color: var(--muted); font: 600 12px/1.4 -apple-system, system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase; }
-    h1 { font: 700 30px/1.2 ui-serif, "New York", Georgia, serif; margin: 10px 0 24px; -webkit-hyphens: manual; hyphens: manual; }
+    .title { font: 700 30px/1.2 ui-serif, "New York", Georgia, serif; margin: 10px 0 24px; -webkit-hyphens: manual; hyphens: manual; }
     h2, h3, h4 { font-family: ui-serif, "New York", Georgia, serif; line-height: 1.25; margin: 1.6em 0 .5em; }
     h2 { font-size: 24px; } h3 { font-size: 20px; } h4 { font-size: 18px; }
     p { margin: 0 0 1em; }

@@ -13,6 +13,21 @@ struct ParsedArticle: Codable, Equatable {
     var lang: String?
 }
 
+extension ParsedArticle {
+    /// Издание: из каталога («Википедия»), иначе как его указал сайт («Фонд Викимедиа»).
+    func siteName(for item: Item?) -> String? {
+        [item?.source, siteName].compactMap { $0 }.first { !$0.isEmpty }
+    }
+
+    /// Автор, если сайт назвал настоящего автора, а не «Contributors to Wikimedia projects».
+    var author: String? {
+        guard let byline, !byline.isEmpty else { return nil }
+        let lowercased = byline.lowercased()
+        let boilerplate = ["wikimedia", "wikipedia", "викимеди", "википеди"]
+        return boilerplate.contains { lowercased.contains($0) } ? nil : byline
+    }
+}
+
 /// Кэш очищенных статей: открытая однажды статья доступна офлайн.
 enum ArticleCache {
     private static func fileURL(id: String) -> URL {
@@ -250,7 +265,8 @@ final class ReaderController {
 
     private func parseCurrentPage() {
         timeoutTask?.cancel()
-        webView.callAsyncJavaScript(Self.parseScript, arguments: [:], in: nil, in: .defaultClient) { [weak self] result in
+        let arguments: [String: Any] = ["expectedTitle": item?.title ?? ""]
+        webView.callAsyncJavaScript(Self.parseScript, arguments: arguments, in: nil, in: .defaultClient) { [weak self] result in
             MainActor.assumeIsolated {
                 self?.handleParse(result)
             }
@@ -334,16 +350,37 @@ final class ReaderController {
     }
 
     /// Тело async-функции для callAsyncJavaScript. Readability подключена user script'ом в том же «мире».
+    /// Аргумент `expectedTitle` — название статьи из каталога.
     private static let parseScript = """
     if (typeof Readability === "undefined") { return null; }
     const documentClone = document.cloneNode(true);
+    // Мобильная Википедия сворачивает разделы (hidden="until-found"), а Readability пропускает скрытое.
+    documentClone.querySelectorAll('[hidden="until-found"]').forEach((node) => node.removeAttribute("hidden"));
+    // Служебное у Википедии: «перенаправлено с…», ссылки «править», навигационные шаблоны.
+    documentClone
+      .querySelectorAll(".mw-redirectedfrom, #contentSub, #siteSub, .mw-editsection, .mw-jump-link, .navbox, .noprint")
+      .forEach((node) => node.remove());
     const article = new Readability(documentClone, { charThreshold: 250 }).parse();
     if (!article || !article.content) { return null; }
+
+    // Заголовок показывает сама читалка — убираем его повтор в начале текста.
+    const normalize = (text) => (text || "").replace(/\\u00AD/g, "").replace(/[^\\p{L}\\p{N}]+/gu, " ").trim().toLowerCase();
+    const titles = [expectedTitle, article.title].map(normalize).filter((text) => text.length > 0);
+    const parsed = new DOMParser().parseFromString(article.content, "text/html");
+    const heading = parsed.body.querySelector("h1, h2, h3");
+    if (heading) {
+      const text = normalize(heading.textContent);
+      const position = normalize(parsed.body.textContent).indexOf(text);
+      if (text.length > 0 && titles.includes(text) && position >= 0 && position < 200) {
+        heading.remove();
+      }
+    }
+
     return {
       title: article.title || "",
       byline: article.byline || "",
       siteName: article.siteName || "",
-      content: article.content,
+      content: parsed.body.innerHTML,
       length: article.length || 0,
       lang: article.lang || document.documentElement.lang || ""
     };

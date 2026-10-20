@@ -43,7 +43,7 @@ struct ReaderScreen: View {
                 }
             }
             .animation(.spring(duration: 0.35), value: showFinishButton)
-            .navigationTitle(controller.article?.siteName ?? item.source ?? "")
+            .navigationTitle(controller.article?.siteName(for: item) ?? item.source ?? "")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
