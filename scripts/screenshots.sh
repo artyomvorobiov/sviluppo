@@ -13,6 +13,19 @@ RAW="$(mktemp -d)"
 BUNDLE=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$APP/Info.plist")
 echo "Bundle: $BUNDLE"
 
+# Отвечает ли iTunes Search API этой машине (оттуда берутся обложки и постеры).
+itunes_check() {
+  local code count
+  code=$(curl -s -o "$RAW/itunes.json" -w "%{http_code}" "https://itunes.apple.com/search?$1&country=us&limit=5" || echo "000")
+  count=$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["resultCount"])' "$RAW/itunes.json" 2>/dev/null || echo "?")
+  echo "iTunes: HTTP $code, найдено: $count — $1"
+}
+itunes_check "term=Fargo&media=movie&entity=movie"
+sleep 3
+itunes_check "term=Bon%20Iver%20For%20Emma%2C%20Forever%20Ago&media=music&entity=album"
+sleep 3
+itunes_check "term=Nils%20Frahm%20Felt&media=music&entity=album"
+
 UDID=$(xcrun simctl list devices available -j | python3 -c '
 import json, sys
 data = json.load(sys.stdin)["devices"]
@@ -74,7 +87,7 @@ done <<'EOF'
 03-painting kvartet://item/painting-above-eternal-peace 10
 04-slow-looking kvartet://item/painting-above-eternal-peace?open=look 10
 05-article kvartet://item/article-cage-4-33 6
-06-reader-wikipedia kvartet://item/article-cage-4-33?open=reader 18
+06-reader-wikipedia kvartet://item/article-voynich-manuscript?open=reader 22
 07-album kvartet://item/album-nils-frahm-felt 10
 08-film kvartet://item/film-into-great-silence 10
 09-reader-arzamas kvartet://item/article-arzamas-pasternak-bruegel?open=reader 20

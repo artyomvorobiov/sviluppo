@@ -195,20 +195,30 @@ final class AppModel {
 
     /// Заранее скачиваем изображения на сегодня и завтра — для виджета и работы без сети.
     func prefetchUpcomingArtwork() {
-        let items = issue(for: today).items + issue(for: Days.adding(days: 1, to: today)).items
+        let todayItems = issue(for: today).items
+        let tomorrowItems = issue(for: Days.adding(days: 1, to: today)).items
         Task.detached(priority: .utility) {
-            var downloaded = false
-            for item in items {
-                guard let url = await MediaResolver.shared.artworkURL(for: item),
-                      !ImageStore.shared.isCached(url)
-                else { continue }
-                await ImageStore.shared.prefetch(url)
-                downloaded = true
-            }
+            var downloaded = await Self.prefetchArtwork(for: todayItems)
+            // Завтрашние — чуть позже, чтобы не просить у iTunes всё разом.
+            try? await Task.sleep(nanoseconds: 20_000_000_000)
+            downloaded = await Self.prefetchArtwork(for: tomorrowItems) || downloaded
             if downloaded {
                 WidgetCenter.shared.reloadAllTimelines()
             }
         }
+    }
+
+    /// true — что-то скачали.
+    private nonisolated static func prefetchArtwork(for items: [Item]) async -> Bool {
+        var downloaded = false
+        for item in items {
+            guard let url = await MediaResolver.shared.artworkURL(for: item),
+                  !ImageStore.shared.isCached(url)
+            else { continue }
+            await ImageStore.shared.prefetch(url)
+            downloaded = true
+        }
+        return downloaded
     }
 
     private func refreshRemoteCatalogIfNeeded() async {

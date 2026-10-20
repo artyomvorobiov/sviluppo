@@ -10,21 +10,26 @@ actor MediaResolver {
 
     private enum Lookup: Sendable {
         case found(String)
-        case notFound
+        /// Не нашли; искать снова не раньше чем через `retryAfter` секунд.
+        case notFound(retryAfter: TimeInterval)
         case failed
     }
 
     private struct Entry: Codable {
         var value: String?
         var date: Date
+        /// Для «не нашли»: когда можно искать снова.
+        var retryAt: Date?
     }
 
     private var cache: [String: Entry] = [:]
     private var loaded = false
     private var inFlight: [String: Task<Lookup, Never>] = [:]
     private let fileURL = AppGroup.containerURL.appendingPathComponent("media-cache.json")
-    /// Через сколько повторять поиск, если в прошлый раз ничего не нашлось.
-    private let retryInterval: TimeInterval = 3 * 24 * 3600
+    /// Через сколько повторять поиск, если подходящего результата не нашлось.
+    private static let retryNotFound: TimeInterval = 3 * 24 * 3600
+    /// …и если iTunes вернул пустой список: так он отвечает и под нагрузкой, поэтому ждём недолго.
+    private static let retryEmpty: TimeInterval = 20 * 60
 
     private static let session: URLSession = {
         let configuration = URLSessionConfiguration.default
@@ -35,7 +40,7 @@ actor MediaResolver {
     }()
 
     /// iTunes Search API пускает примерно 20 запросов в минуту с одного адреса.
-    private static let iTunesGate = RequestGate(spacing: 0.5, pauseAfterRefusal: 90)
+    private static let iTunesGate = RequestGate(spacing: 1, pauseAfterRefusal: 90)
     private static let log = Logger(subsystem: "Kvartet", category: "media")
 
     // MARK: - Публичный интерфейс
@@ -68,7 +73,7 @@ actor MediaResolver {
         if wiki.hasPrefix("ru:") { return fallback }
         let value = await resolve(key: item.id + "|wiki") {
             switch await Self.wikipediaInfo(wiki) {
-            case .some(let info): return info.ruURL.map(Lookup.found) ?? .notFound
+            case .some(let info): return info.ruURL.map(Lookup.found) ?? .notFound(retryAfter: Self.retryNotFound)
             case .none: return .failed
             }
         }
@@ -99,8 +104,8 @@ actor MediaResolver {
             cache[key] = Entry(value: value, date: Date())
             save()
             return value
-        case .notFound:
-            cache[key] = Entry(value: nil, date: Date())
+        case .notFound(let retryAfter):
+            cache[key] = Entry(value: nil, date: Date(), retryAt: Date().addingTimeInterval(retryAfter))
             save()
             return nil
         case .failed:
@@ -112,7 +117,8 @@ actor MediaResolver {
     private func usable(_ entry: Entry?) -> Entry? {
         guard let entry else { return nil }
         if entry.value != nil { return entry }
-        return Date().timeIntervalSince(entry.date) < retryInterval ? entry : nil
+        let retryAt = entry.retryAt ?? entry.date.addingTimeInterval(Self.retryNotFound)
+        return Date() < retryAt ? entry : nil
     }
 
     private func loadIfNeeded() {
@@ -138,43 +144,40 @@ actor MediaResolver {
 
     private static func findArtwork(for item: Item) async -> Lookup {
         var failed = false
+        var retryAfter = retryNotFound
+        let iTunes: Match?
         switch item.kind {
-        case .album:
-            switch await iTunesAlbum(item) {
-            case .found(let match):
-                if let art = match.artworkUrl100 { return .found(upscaledArtwork(art)) }
-            case .notFound: break
-            case .failed: failed = true
-            }
-        case .film:
-            switch await iTunesMovie(item) {
-            case .found(let match):
-                if let art = match.artworkUrl100 { return .found(upscaledArtwork(art)) }
-            case .notFound: break
-            case .failed: failed = true
-            }
-        case .painting, .article:
-            break
+        case .album: iTunes = await iTunesAlbum(item)
+        case .film: iTunes = await iTunesMovie(item)
+        case .painting, .article: iTunes = nil
+        }
+        switch iTunes {
+        case .found(let match):
+            if let art = match.artworkUrl100 { return .found(upscaledArtwork(art)) }
+        case .empty: retryAfter = retryEmpty
+        case .failed: failed = true
+        case .notFound, nil: break
         }
         if let wiki = item.wiki {
             guard let info = await wikipediaInfo(wiki) else { return .failed }
             if let image = info.image { return .found(image) }
         }
-        return failed ? .failed : .notFound
+        return failed ? .failed : .notFound(retryAfter: retryAfter)
     }
 
     private static func findPreview(for item: Item) async -> Lookup {
         switch item.kind {
         case .film:
             switch await iTunesMovie(item) {
-            case .found(let match): return match.previewUrl.map(Lookup.found) ?? .notFound
-            case .notFound: return .notFound
+            case .found(let match): return match.previewUrl.map(Lookup.found) ?? .notFound(retryAfter: retryNotFound)
+            case .notFound: return .notFound(retryAfter: retryNotFound)
+            case .empty: return .notFound(retryAfter: retryEmpty)
             case .failed: return .failed
             }
         case .album:
             return await iTunesSongPreview(item)
         case .painting, .article:
-            return .notFound
+            return .notFound(retryAfter: retryNotFound)
         }
     }
 
@@ -250,7 +253,10 @@ actor MediaResolver {
 
     private enum Match: Sendable {
         case found(ITunesItem)
+        /// Результаты были, но ни один не подошёл.
         case notFound
+        /// Все поиски вернули пустой список.
+        case empty
         case failed
     }
 
@@ -292,57 +298,74 @@ actor MediaResolver {
     private static func iTunesAlbum(_ item: Item) async -> Match {
         let artists = artists(of: item)
         let titles = titles(of: item)
-        var failed = false
+        var outcome = SearchOutcome()
         for country in countries(for: item) {
-            guard let results = await iTunesSearch(term: "\(artists[0]) \(titles[0])", media: "music", entity: "album", country: country) else {
-                failed = true
-                continue
-            }
-            let match = results.first { result in
+            let results = await iTunesSearch(term: "\(artists[0]) \(titles[0])", media: "music", entity: "album", country: country)
+            let match = outcome.record(results)?.first { result in
                 artists.contains { Matching.sameArtist($0, result.artistName) }
                     && titles.contains { Matching.sameTitle($0, result.collectionName) }
             }
             if let match { return .found(match) }
         }
-        return failed ? .failed : .notFound
+        return outcome.miss
     }
 
     private static func iTunesMovie(_ item: Item) async -> Match {
         let titles = titles(of: item)
-        var failed = false
+        var outcome = SearchOutcome()
         for country in countries(for: item) {
-            for title in titles {
-                guard let results = await iTunesSearch(term: title, media: "movie", entity: "movie", country: country) else {
-                    failed = true
-                    continue
-                }
-                let match = results.first { result in
+            // В американском iTunes нет смысла искать по-русски или по-японски.
+            for title in titles where country != "us" || Matching.isLatin(title) {
+                let results = await iTunesSearch(term: title, media: "movie", entity: "movie", country: country)
+                let match = outcome.record(results)?.first { result in
                     titles.contains { Matching.sameTitle($0, result.trackName) }
                         && Matching.isYear(item.yearValue, closeTo: result.releaseDate)
                 }
                 if let match { return .found(match) }
             }
         }
-        return failed ? .failed : .notFound
+        return outcome.miss
     }
 
     private static func iTunesSongPreview(_ item: Item) async -> Lookup {
-        guard let track = item.keyTrack else { return .notFound }
+        guard let track = item.keyTrack else { return .notFound(retryAfter: retryNotFound) }
         let artists = artists(of: item)
-        var failed = false
+        var outcome = SearchOutcome()
         for country in countries(for: item) {
-            guard let results = await iTunesSearch(term: "\(artists[0]) \(track)", media: "music", entity: "song", country: country) else {
-                failed = true
-                continue
-            }
-            let match = results.first { result in
+            let results = await iTunesSearch(term: "\(artists[0]) \(track)", media: "music", entity: "song", country: country)
+            let match = outcome.record(results)?.first { result in
                 result.previewUrl != nil
                     && artists.contains { Matching.sameArtist($0, result.artistName) }
                     && Matching.sameTitle(track, result.trackName)
             }
             if let preview = match?.previewUrl { return .found(preview) }
         }
-        return failed ? .failed : .notFound
+        switch outcome.miss {
+        case .failed: return .failed
+        case .empty: return .notFound(retryAfter: retryEmpty)
+        default: return .notFound(retryAfter: retryNotFound)
+        }
+    }
+
+    /// Итог нескольких поисков без совпадения: сбой сети, пустые ответы или просто не нашли.
+    private struct SearchOutcome {
+        private var failed = false
+        private var sawResults = false
+
+        /// Запоминает ответ и возвращает его (nil — сбой).
+        mutating func record(_ results: [ITunesItem]?) -> [ITunesItem]? {
+            if let results {
+                sawResults = sawResults || !results.isEmpty
+            } else {
+                failed = true
+            }
+            return results
+        }
+
+        var miss: Match {
+            if failed { return .failed }
+            return sawResults ? .notFound : .empty
+        }
     }
 
     /// iTunes отдаёт картинку 100×100; меняем размер в адресе на 1200×1200 (с сохранением пропорций).
@@ -434,6 +457,11 @@ enum Matching {
         let b = normalize(candidate)
         guard !a.isEmpty, !b.isEmpty else { return false }
         return a == b || b.contains(a) || a.contains(b)
+    }
+
+    /// Название латиницей (в том числе с диакритикой: «Die große Stille», «Höstsonaten»).
+    static func isLatin(_ text: String) -> Bool {
+        text.unicodeScalars.allSatisfy { !CharacterSet.letters.contains($0) || $0.value < 0x0250 }
     }
 
     static func isYear(_ year: Int?, closeTo releaseDate: String?, tolerance: Int = 2) -> Bool {
