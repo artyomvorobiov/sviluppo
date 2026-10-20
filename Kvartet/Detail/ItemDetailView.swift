@@ -59,6 +59,14 @@ struct ItemDetailView: View {
         .sheet(item: $trailerLink) { link in
             TrailerPlayerView(url: link.url)
         }
+        .onAppear {
+            switch model.takePendingOpen(for: item) {
+            case .reader: showReader = item.kind == .article
+            case .look: showSlowLooking = item.kind == .painting
+            case .zoom: showZoom = item.kind == .painting
+            case nil: break
+            }
+        }
         .task(id: item.id) {
             readMoreURL = await MediaResolver.shared.readMoreURL(for: item)
         }

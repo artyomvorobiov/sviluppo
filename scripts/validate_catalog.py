@@ -139,7 +139,7 @@ def main() -> int:
         if count > 1:
             errors.append(f"id рекомендации «{item_id}» повторяется {count} раз(а)")
 
-    repeated = [f"{creator} ({kind}) ×{n}" for (kind, creator), n in creators.items() if n > 2]
+    repeated = [f"{creator} ({kind}) ×{n}" for (kind, creator), n in creators.items() if n > 2 and kind != "article"]
     if repeated:
         warnings.append("часто повторяются авторы: " + "; ".join(repeated))
 

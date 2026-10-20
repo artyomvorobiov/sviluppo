@@ -22,6 +22,9 @@ final class AppModel {
     var todayPath: [Route] = []
     var archivePath: [Route] = []
     var journalPath: [Route] = []
+    /// Что сразу открыть на экране рекомендации после перехода по ссылке
+    /// (kvartet://item/<id>?open=reader|look|zoom).
+    var pendingOpen: PendingOpen?
 
     private let store = UserStateStore.shared
     @ObservationIgnored private var lastRemoteCheck: Date?
@@ -211,17 +214,48 @@ final class AppModel {
 
     // MARK: - Ссылки kvartet://
 
+    /// kvartet://today, kvartet://archive, kvartet://journal,
+    /// kvartet://item/<id> и kvartet://item/<id>?open=reader|look|zoom.
     func handle(url: URL) {
         guard url.scheme == AppConfig.urlScheme else { return }
         let parts = url.pathComponents.filter { $0 != "/" }
         switch url.host {
         case "item":
             guard let id = parts.first, library.item(id: id) != nil else { return }
+            let open = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+                .queryItems?.first(where: { $0.name == "open" })?.value
+                .flatMap(PendingOpen.Action.init(rawValue:))
+            pendingOpen = open.map { PendingOpen(itemID: id, action: $0) }
             selectedTab = .today
             todayPath = [.item(id)]
+        case "archive":
+            selectedTab = .archive
+            archivePath = []
+        case "journal":
+            selectedTab = .journal
+            journalPath = []
         default:
             selectedTab = .today
             todayPath = []
         }
     }
+
+    /// Забрать отложенное действие для рекомендации (одноразово).
+    func takePendingOpen(for item: Item) -> PendingOpen.Action? {
+        guard let pendingOpen, pendingOpen.itemID == item.id else { return nil }
+        self.pendingOpen = nil
+        return pendingOpen.action
+    }
+}
+
+/// Действие, которое нужно выполнить сразу после перехода к рекомендации.
+struct PendingOpen: Equatable {
+    enum Action: String {
+        case reader
+        case look
+        case zoom
+    }
+
+    let itemID: String
+    let action: Action
 }
