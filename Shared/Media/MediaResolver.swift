@@ -3,7 +3,8 @@ import os
 
 /// Находит изображения и фрагменты для рекомендаций без ключей API:
 /// • картины и статьи — свободные изображения Википедии (prop=pageimages отдаёт только свободные файлы);
-/// • альбомы и фильмы — обложки, 30-секундные фрагменты и трейлеры из iTunes Search API.
+/// • альбомы и фильмы — обложки, 30-секундные фрагменты и трейлеры из iTunes Search API,
+///   а если там не нашлось — обложка или постер из статьи Википедии.
 /// Найденные ссылки кэшируются в общем контейнере, чтобы виджет не искал их заново.
 actor MediaResolver {
     static let shared = MediaResolver()
@@ -159,7 +160,9 @@ actor MediaResolver {
         case .notFound, nil: break
         }
         if let wiki = item.wiki {
-            guard let info = await wikipediaInfo(wiki) else { return .failed }
+            // Обложки и постеры в Википедии — несвободные файлы, их просим отдельно.
+            let anyLicense = item.kind == .album || item.kind == .film
+            guard let info = await wikipediaInfo(wiki, anyLicense: anyLicense) else { return .failed }
             if let image = info.image { return .found(image) }
         }
         return failed ? .failed : .notFound(retryAfter: retryAfter)
@@ -207,7 +210,8 @@ actor MediaResolver {
     }
 
     /// `wiki` в формате "en:The_Hunters_in_the_Snow". nil — ошибка сети.
-    static func wikipediaInfo(_ wiki: String) async -> WikiInfo? {
+    /// `anyLicense` — брать и несвободное изображение статьи (обложку альбома, постер фильма).
+    static func wikipediaInfo(_ wiki: String, anyLicense: Bool = false) async -> WikiInfo? {
         let parts = wiki.split(separator: ":", maxSplits: 1).map(String.init)
         guard parts.count == 2 else { return WikiInfo() }
         var components = URLComponents()
@@ -227,6 +231,9 @@ actor MediaResolver {
             URLQueryItem(name: "inprop", value: "url"),
             URLQueryItem(name: "titles", value: parts[1].replacingOccurrences(of: "_", with: " "))
         ]
+        if anyLicense {
+            components.queryItems?.append(URLQueryItem(name: "pilicense", value: "any"))
+        }
         guard let url = components.url, let data = await get(url) else { return nil }
         guard let response = try? JSONDecoder().decode(WikiResponse.self, from: data),
               let page = response.query?.pages?.first,
@@ -239,6 +246,8 @@ actor MediaResolver {
     // MARK: - iTunes
 
     struct ITunesItem: Decodable, Sendable {
+        /// «feature-movie», «song»… (у альбомов нет).
+        let kind: String?
         let artistName: String?
         let collectionName: String?
         let trackName: String?
@@ -261,19 +270,20 @@ actor MediaResolver {
     }
 
     /// nil — ошибка сети.
-    private static func iTunesSearch(term: String, media: String, entity: String, country: String) async -> [ITunesItem]? {
+    /// Без `media` и `entity` ищет по всему магазину.
+    private static func iTunesSearch(term: String, media: String?, entity: String?, country: String, limit: Int = 25) async -> [ITunesItem]? {
         var components = URLComponents(string: "https://itunes.apple.com/search")
         components?.queryItems = [
             URLQueryItem(name: "term", value: term),
-            URLQueryItem(name: "media", value: media),
-            URLQueryItem(name: "entity", value: entity),
             URLQueryItem(name: "country", value: country),
-            URLQueryItem(name: "limit", value: "25")
+            URLQueryItem(name: "limit", value: String(limit))
         ]
+        if let media { components?.queryItems?.append(URLQueryItem(name: "media", value: media)) }
+        if let entity { components?.queryItems?.append(URLQueryItem(name: "entity", value: entity)) }
         guard let url = components?.url, let data = await get(url, gate: iTunesGate) else { return nil }
         let results = (try? JSONDecoder().decode(ITunesResponse.self, from: data))?.results ?? []
         if results.isEmpty {
-            log.notice("iTunes: nothing for «\(term, privacy: .public)» (\(entity, privacy: .public), \(country, privacy: .public))")
+            log.notice("iTunes: nothing for «\(term, privacy: .public)» (\(entity ?? "all", privacy: .public), \(country, privacy: .public))")
         }
         return results
     }
@@ -306,6 +316,16 @@ actor MediaResolver {
                     && titles.contains { Matching.sameTitle($0, result.collectionName) }
             }
             if let match { return .found(match) }
+            // Поиск альбомов находит не всё (например, «For Emma, Forever Ago»), а песня с него
+            // находится — и у неё та же обложка.
+            if let track = item.keyTrack {
+                let songs = await iTunesSearch(term: "\(artists[0]) \(track)", media: "music", entity: "song", country: country)
+                let song = outcome.record(songs)?.first { result in
+                    artists.contains { Matching.sameArtist($0, result.artistName) }
+                        && titles.contains { Matching.sameTitle($0, result.collectionName) }
+                }
+                if let song { return .found(song) }
+            }
         }
         return outcome.miss
     }
@@ -316,9 +336,12 @@ actor MediaResolver {
         for country in countries(for: item) {
             // В американском iTunes нет смысла искать по-русски или по-японски.
             for title in titles where country != "us" || Matching.isLatin(title) {
-                let results = await iTunesSearch(term: title, media: "movie", entity: "movie", country: country)
+                // Поиск с media=movie сейчас ничего не находит, поэтому ищем по всему магазину
+                // и берём только полнометражные фильмы.
+                let results = await iTunesSearch(term: title, media: nil, entity: nil, country: country, limit: 50)
                 let match = outcome.record(results)?.first { result in
-                    titles.contains { Matching.sameTitle($0, result.trackName) }
+                    result.kind == "feature-movie"
+                        && titles.contains { Matching.sameTitle($0, result.trackName) }
                         && Matching.isYear(item.yearValue, closeTo: result.releaseDate)
                 }
                 if let match { return .found(match) }
