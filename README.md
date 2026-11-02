@@ -5,7 +5,7 @@
 Приложение для iPhone (iOS 17+) с виджетами для экрана «Домой» и экрана блокировки.
 В первый день тема — «Тишина»: Левитан, пьеса Джона Кейджа без единой ноты, ночная музыка Нильса Фрама
 и фильм о монахах-картезианцах. На второй — «Зима», на третий — «Ночной город».
-В каталоге 59 тематических выпусков (236 рекомендаций), его легко пополнять.
+В каталоге 71 тематический выпуск (284 рекомендации), его легко пополнять.
 
 <p>
 <img src="docs/screenshots/02-today.jpg" width="200" alt="Выпуск дня">
@@ -255,7 +255,7 @@ BUNDLE_ID_PREFIX = com.ivanpetrov
 ## Благодарности и лицензии
 
 - [Mozilla Readability](https://github.com/mozilla/readability) — режим чтения, Apache License 2.0
-  (файл `Kvartet/Reader/Readability.js`).
+  (файл `Shared/Resources/Readability.js`, общий для iOS и Android).
 - Изображения картин — [Wikimedia Commons](https://commons.wikimedia.org) через API Википедии.
 - Обложки, фрагменты и трейлеры — [iTunes Search API](https://performance-partners.apple.com/search-api);
   запасной источник постеров и обложек — статьи Википедии.

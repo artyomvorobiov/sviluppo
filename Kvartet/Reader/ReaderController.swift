@@ -265,7 +265,7 @@ final class ReaderController {
 
     private func parseCurrentPage() {
         timeoutTask?.cancel()
-        let arguments: [String: Any] = ["expectedTitle": item?.title ?? ""]
+        let arguments: [String: Any] = ["expectedTitle": item?.title ?? "", "plainText": isWikipedia]
         webView.callAsyncJavaScript(Self.parseScript, arguments: arguments, in: nil, in: .defaultClient) { [weak self] result in
             MainActor.assumeIsolated {
                 self?.handleParse(result)
@@ -303,11 +303,16 @@ final class ReaderController {
         guard let article else { return }
         pendingScrollRatio = keepScroll ? progress : nil
         phase = .renderingReader
-        let html = ReaderTemplate.html(article: article, item: item, theme: theme, minutes: minutes)
+        let html = ReaderTemplate.html(article: article, item: item, theme: theme, minutes: minutes, plainLinks: isWikipedia)
         webView.loadHTMLString(html, baseURL: sourceURL)
     }
 
     // MARK: - Ссылки и прокрутка
+
+    /// Статьи Википедии показываем без ссылок и сносок.
+    private var isWikipedia: Bool {
+        sourceURL?.host?.hasSuffix("wikipedia.org") ?? false
+    }
 
     private func handleLink(_ url: URL) -> Bool {
         // Сноски и оглавление внутри статьи.
@@ -350,10 +355,15 @@ final class ReaderController {
     }
 
     /// Тело async-функции для callAsyncJavaScript. Readability подключена user script'ом в том же «мире».
-    /// Аргумент `expectedTitle` — название статьи из каталога.
+    /// Аргументы: `expectedTitle` — название статьи из каталога;
+    /// `plainText` — убрать ссылки, сноски и списки литературы (для Википедии).
     private static let parseScript = """
     if (typeof Readability === "undefined") { return null; }
     const documentClone = document.cloneNode(true);
+    if (plainText) {
+      // Сноски вида [1] и [прим. 2] без ссылок только мешают читать.
+      documentClone.querySelectorAll("sup.reference, .mw-ref, .reference").forEach((node) => node.remove());
+    }
     // Мобильная Википедия сворачивает разделы (hidden="until-found"), а Readability пропускает скрытое.
     documentClone.querySelectorAll('[hidden="until-found"]').forEach((node) => node.removeAttribute("hidden"));
     // Служебное у Википедии: «перенаправлено с…», ссылки «править», навигационные шаблоны.
@@ -374,6 +384,29 @@ final class ReaderController {
       if (text.length > 0 && titles.includes(text) && position >= 0 && position < 200) {
         heading.remove();
       }
+    }
+
+    if (plainText) {
+      // Разделы со ссылками и источниками в конце статьи.
+      const tail = ["примечания", "литература", "ссылки", "см также", "источники", "комментарии",
+        "notes", "references", "external links", "see also", "further reading", "sources"];
+      Array.from(parsed.body.querySelectorAll("h2, h3"))
+        .filter((node) => tail.includes(normalize(node.textContent)))
+        .forEach((node) => {
+          let block = node;
+          while (block.parentElement && block.parentElement !== parsed.body && block.parentElement.children.length === 1) {
+            block = block.parentElement;
+          }
+          let next = block.nextElementSibling;
+          while (next && !next.matches("h2, h3") && !next.querySelector("h2, h3")) {
+            const current = next;
+            next = next.nextElementSibling;
+            current.remove();
+          }
+          block.remove();
+        });
+      // Ссылки превращаем в обычный текст, картинки внутри ссылок остаются.
+      parsed.body.querySelectorAll("a").forEach((link) => link.replaceWith(...link.childNodes));
     }
 
     // Время чтения считаем по абзацам: сноски, таблицы и списки литературы почти никто не читает.

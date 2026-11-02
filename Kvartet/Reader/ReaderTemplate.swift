@@ -2,7 +2,8 @@ import Foundation
 
 /// HTML-вёрстка режима чтения.
 enum ReaderTemplate {
-    static func html(article: ParsedArticle, item: Item?, theme: ReaderTheme, minutes: Int?) -> String {
+    /// `plainLinks` — ссылки выглядят и ведут себя как обычный текст (статьи Википедии).
+    static func html(article: ParsedArticle, item: Item?, theme: ReaderTheme, minutes: Int?, plainLinks: Bool = false) -> String {
         // Название из каталога аккуратнее, чем <title> страницы («… — Википедия»).
         let title = escape(item?.title ?? article.title)
         var meta: [String] = []
@@ -20,7 +21,7 @@ enum ReaderTemplate {
         <meta name="color-scheme" content="light dark">
         <style>\(css)</style>
         </head>
-        <body class="theme-\(theme.rawValue)">
+        <body class="theme-\(theme.rawValue)\(plainLinks ? " plain-links" : "")">
         <main class="reader">
         <p class="meta">\(meta.joined(separator: " · "))</p>
         <h1 class="title">\(title)</h1>
@@ -61,6 +62,7 @@ enum ReaderTemplate {
     h2 { font-size: 24px; } h3 { font-size: 20px; } h4 { font-size: 18px; }
     p { margin: 0 0 1em; }
     a { color: var(--link); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+    .plain-links a { color: inherit; text-decoration: none; pointer-events: none; }
     img, video, svg, canvas, iframe { max-width: 100% !important; height: auto !important; }
     img { display: block; margin: 18px auto; border-radius: 6px; }
     figure { margin: 24px 0; }
