@@ -1,6 +1,7 @@
 package app.kvartet
 
 import android.content.Intent
+import android.content.pm.ApplicationInfo
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -56,6 +57,11 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         Kvartet.init(this)
+        // Для автоматических скриншотов: отладочная сборка с флагом skipOnboarding сразу открывает выпуск.
+        val debuggable = applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
+        if (debuggable && intent?.getBooleanExtra("skipOnboarding", false) == true) {
+            Kvartet.settings.update { it.copy(onboarded = true) }
+        }
         pendingLink.value = intent?.data
         setContent {
             KvartetTheme {
