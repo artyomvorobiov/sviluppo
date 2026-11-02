@@ -20,12 +20,16 @@ adb shell settings put global anr_show_background 0
 # Настройка применяется при смене конфигурации — переключаем ночной режим туда-обратно.
 adb shell "cmd uimode night yes"
 adb shell "cmd uimode night no"
-# Ровные часы и полная батарея в строке состояния.
-adb shell settings put global sysui_demo_allowed 1
-adb shell am broadcast -a com.android.systemui.demo -e command enter >/dev/null
-adb shell am broadcast -a com.android.systemui.demo -e command clock -e hhmm 0941 >/dev/null
-adb shell am broadcast -a com.android.systemui.demo -e command battery -e level 100 -e plugged false >/dev/null
-adb shell am broadcast -a com.android.systemui.demo -e command notifications -e visible false >/dev/null
+# Ровные часы и полная батарея в строке состояния (после смены темы SystemUI сбрасывает демо-режим).
+demo_status_bar() {
+  adb shell settings put global sysui_demo_allowed 1
+  adb shell am broadcast -a com.android.systemui.demo -e command enter >/dev/null
+  adb shell am broadcast -a com.android.systemui.demo -e command clock -e hhmm 0941 >/dev/null
+  adb shell am broadcast -a com.android.systemui.demo -e command battery -e level 100 -e plugged false >/dev/null
+  adb shell am broadcast -a com.android.systemui.demo -e command network -e wifi show -e level 4 >/dev/null
+  adb shell am broadcast -a com.android.systemui.demo -e command network -e mobile show -e datatype none -e level 4 >/dev/null
+  adb shell am broadcast -a com.android.systemui.demo -e command notifications -e visible false >/dev/null
+}
 
 close_dialogs() {
   adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS >/dev/null 2>&1
@@ -48,6 +52,7 @@ open_link() {
 adb shell input keyevent KEYCODE_HOME
 sleep 20
 close_dialogs
+demo_status_bar
 
 adb shell am start -W -n "$ACTIVITY" >/dev/null
 shot 01-onboarding 8
@@ -70,6 +75,8 @@ done <<'LIST'
 LIST
 
 adb shell "cmd uimode night yes"
+sleep 5
+demo_status_bar
 open_link kvartet://today
 shot 12-today-dark 10
 open_link kvartet://item/painting-hunters-in-the-snow
