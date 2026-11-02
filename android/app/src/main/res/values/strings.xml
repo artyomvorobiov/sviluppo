@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Квартет</string>
+    <string name="widget_quartet_name">Квартет дня</string>
+    <string name="widget_quartet_description">Тема дня и четыре рекомендации. Отмечайте изученное прямо на экране.</string>
+    <string name="widget_painting_name">Картина дня</string>
+    <string name="widget_painting_description">Картина из сегодняшнего выпуска — как маленькая галерея на экране.</string>
+    <string name="reminder_channel">Напоминание о выпуске дня</string>
+</resources>
