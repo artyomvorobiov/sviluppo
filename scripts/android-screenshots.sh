@@ -10,7 +10,16 @@ ACTIVITY="$PKG/app.kvartet.MainActivity"
 mkdir -p "$OUT"
 rm -f "$OUT"/*.png "$OUT"/*.jpg
 
+# adb shell читает стандартный ввод — отдаём ему /dev/null, иначе он «съест» список ниже.
+adb() { command adb "$@" </dev/null; }
+
 adb install -r "$APK"
+# Системные окна «приложение не отвечает» (в эмуляторе их часто показывает лаунчер) не нужны на снимках.
+adb shell settings put global hide_error_dialogs 1
+adb shell settings put global anr_show_background 0
+# Настройка применяется при смене конфигурации — переключаем ночной режим туда-обратно.
+adb shell "cmd uimode night yes"
+adb shell "cmd uimode night no"
 # Ровные часы и полная батарея в строке состояния.
 adb shell settings put global sysui_demo_allowed 1
 adb shell am broadcast -a com.android.systemui.demo -e command enter >/dev/null
@@ -18,16 +27,27 @@ adb shell am broadcast -a com.android.systemui.demo -e command clock -e hhmm 094
 adb shell am broadcast -a com.android.systemui.demo -e command battery -e level 100 -e plugged false >/dev/null
 adb shell am broadcast -a com.android.systemui.demo -e command notifications -e visible false >/dev/null
 
+close_dialogs() {
+  adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS >/dev/null 2>&1
+}
+
 shot() {
   sleep "$2"
+  close_dialogs
+  sleep 1
   adb exec-out screencap -p > "$OUT/$1.png"
   echo "📸 $1"
 }
 
 open_link() {
   adb shell am force-stop "$PKG"
-  adb shell am start -W -a android.intent.action.VIEW -d "$1" -n "$ACTIVITY" --ez skipOnboarding true >/dev/null
+  adb shell am start -W -a android.intent.action.VIEW -d "'$1'" -n "$ACTIVITY" --ez skipOnboarding true >/dev/null
 }
+
+# Даём лаунчеру спокойно запуститься после загрузки, чтобы он не «зависал» во время съёмки.
+adb shell input keyevent KEYCODE_HOME
+sleep 20
+close_dialogs
 
 adb shell am start -W -n "$ACTIVITY" >/dev/null
 shot 01-onboarding 8
