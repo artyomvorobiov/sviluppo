@@ -27,7 +27,7 @@ jobs:
 
       - name: Сборка
         working-directory: android
-        run: ./gradlew assembleDebug assembleRelease --stacktrace
+        run: ./gradlew assembleDebug assembleRelease
 
       - name: Переименовать APK
         run: |

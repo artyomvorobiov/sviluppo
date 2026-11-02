@@ -109,8 +109,8 @@ fun ReaderScreen(item: Item, onBack: () -> Unit) {
     val webView = remember {
         WebView(context).apply {
             layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
-            settings.javaScriptEnabled = true
-            settings.domStorageEnabled = true
+            this.settings.javaScriptEnabled = true
+            this.settings.domStorageEnabled = true
             setBackgroundColor(android.graphics.Color.TRANSPARENT)
         }
     }
