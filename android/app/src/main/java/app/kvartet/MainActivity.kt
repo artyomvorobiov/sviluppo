@@ -62,7 +62,8 @@ class MainActivity : ComponentActivity() {
         if (debuggable && intent?.getBooleanExtra("skipOnboarding", false) == true) {
             Kvartet.settings.update { it.copy(onboarded = true) }
         }
-        pendingLink.value = intent?.data
+        // После поворота экрана или смены темы ссылка уже обработана — не открываем её повторно.
+        if (savedInstanceState == null) pendingLink.value = intent?.data
         setContent {
             KvartetTheme {
                 KvartetRoot(pendingLink)
@@ -179,8 +180,6 @@ private fun KvartetRoot(pendingLink: MutableStateFlow<Uri?>) {
                 val open = entry.arguments?.getString("open")?.let { value ->
                     OpenAction.entries.firstOrNull { it.name.equals(value, ignoreCase = true) }
                 }
-                // Отложенное действие выполняется один раз — потом стираем его из аргументов.
-                entry.arguments?.remove("open")
                 ItemScreen(
                     item = item,
                     openAction = open,

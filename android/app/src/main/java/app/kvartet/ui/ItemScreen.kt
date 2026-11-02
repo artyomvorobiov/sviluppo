@@ -54,6 +54,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -93,12 +94,15 @@ fun ItemScreen(
     var showCompletion by remember { mutableStateOf(false) }
     val readMore by produceState<String?>(null, item.id) { value = Kvartet.media.readMoreUrl(item) }
 
+    // Отложенное действие выполняется один раз: флаг переживает переход в читалку и возврат назад.
+    var openHandled by rememberSaveable(item.id) { mutableStateOf(false) }
     LaunchedEffect(item.id, openAction) {
+        if (openHandled || openAction == null) return@LaunchedEffect
+        openHandled = true
         when (openAction) {
             OpenAction.READER -> if (item.kind == ItemKind.ARTICLE) onRead()
             OpenAction.LOOK -> if (item.kind == ItemKind.PAINTING) onSlowLook()
             OpenAction.ZOOM -> if (item.kind == ItemKind.PAINTING) onZoom()
-            null -> Unit
         }
     }
 
