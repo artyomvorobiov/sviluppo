@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -84,12 +86,12 @@ private fun openIntent(context: Context, link: String) =
 class QuartetWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         Kvartet.init(context)
-        val date = LocalDate.now()
-        val issue = Kvartet.issueFor(date)
-        val items = Kvartet.visibleItems(issue)
-        val done = Kvartet.store.state.value.completions.keys
         provideContent {
-            QuartetContent(date, issue.theme, items, done)
+            // Пока виджет «живой», обновление не вызывает provideGlance заново — поэтому подписываемся на состояние.
+            val state by Kvartet.store.state.collectAsState()
+            val date = LocalDate.now()
+            val issue = Kvartet.issueFor(date)
+            QuartetContent(date, issue.theme, Kvartet.visibleItems(issue), state.completions.keys)
         }
     }
 }
