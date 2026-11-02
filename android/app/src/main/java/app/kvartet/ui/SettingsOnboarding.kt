@@ -42,6 +42,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -245,38 +246,45 @@ fun OnboardingScreen() {
     val setReminder = rememberReminderSwitch()
 
     Column(Modifier.fillMaxSize().systemBarsPadding()) {
-        Column(
-            Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 28.dp).padding(top = 40.dp),
-        ) {
-            QuartetMark()
-            Spacer(Modifier.height(20.dp))
-            Text("Квартет", fontFamily = Serif, fontWeight = FontWeight.Bold, fontSize = 48.sp)
-            Spacer(Modifier.height(8.dp))
-            Text("Каждый день — четыре открытия, связанные одной темой.", fontFamily = Serif, color = Palette.muted, fontSize = 22.sp, lineHeight = 29.sp)
-            Spacer(Modifier.height(28.dp))
-            ItemKind.entries.forEach { kind ->
-                Row(Modifier.padding(vertical = 8.dp), verticalAlignment = Alignment.Top) {
-                    Box(Modifier.padding(top = 6.dp).size(12.dp).clip(RoundedCornerShape(3.dp)).background(kind.color))
-                    Spacer(Modifier.width(14.dp))
-                    Column {
-                        Text(kind.title, fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
-                        Text(kind.onboardingLine, color = Palette.muted)
+        Box(Modifier.weight(1f)) {
+            Column(
+                Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 28.dp).padding(top = 40.dp),
+            ) {
+                QuartetMark()
+                Spacer(Modifier.height(20.dp))
+                Text("Квартет", fontFamily = Serif, fontWeight = FontWeight.Bold, fontSize = 48.sp)
+                Spacer(Modifier.height(8.dp))
+                Text("Каждый день — четыре открытия, связанные одной темой.", fontFamily = Serif, color = Palette.muted, fontSize = 22.sp, lineHeight = 29.sp)
+                Spacer(Modifier.height(28.dp))
+                ItemKind.entries.forEach { kind ->
+                    Row(Modifier.padding(vertical = 8.dp), verticalAlignment = Alignment.Top) {
+                        Box(Modifier.padding(top = 6.dp).size(12.dp).clip(RoundedCornerShape(3.dp)).background(kind.color))
+                        Spacer(Modifier.width(14.dp))
+                        Column {
+                            Text(kind.title, fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
+                            Text(kind.onboardingLine, color = Palette.muted)
+                        }
                     }
                 }
-            }
-            Spacer(Modifier.height(16.dp))
-            Text(
-                "Отмечайте изученное, ставьте оценки и пишите пару слов — так получится дневник ваших открытий. " +
-                    "Виджет покажет выпуск дня прямо на главном экране.",
-                color = Palette.muted,
-            )
-            Spacer(Modifier.height(20.dp))
-            Group {
-                SwitchRow("Напоминать каждый день в ${timeText(settings.reminderHour, settings.reminderMinute)}", settings.reminderEnabled) {
-                    setReminder(it)
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    "Отмечайте изученное, ставьте оценки и пишите пару слов — так получится дневник ваших открытий. " +
+                        "Виджет покажет выпуск дня прямо на главном экране.",
+                    color = Palette.muted,
+                )
+                Spacer(Modifier.height(20.dp))
+                Group {
+                    SwitchRow("Напоминать каждый день в ${timeText(settings.reminderHour, settings.reminderMinute)}", settings.reminderEnabled) {
+                        setReminder(it)
+                    }
                 }
+                Spacer(Modifier.height(24.dp))
             }
-            Spacer(Modifier.height(24.dp))
+            // Текст плавно уходит под кнопку, а не обрезается.
+            Box(
+                Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(28.dp)
+                    .background(Brush.verticalGradient(listOf(Palette.paper.copy(alpha = 0f), Palette.paper))),
+            )
         }
         Button(
             onClick = {

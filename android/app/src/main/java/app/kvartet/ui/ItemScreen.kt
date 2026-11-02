@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -72,6 +71,7 @@ import app.kvartet.data.Format
 import app.kvartet.data.Item
 import app.kvartet.data.ItemKind
 import app.kvartet.data.MusicService
+import coil.compose.AsyncImage
 import kotlinx.coroutines.launch
 
 /** Что открыть сразу после перехода по ссылке kvartet://item/<id>?open=… */
@@ -195,16 +195,42 @@ fun ItemScreen(
     }
 }
 
+/** Картина целиком: рамка принимает пропорции изображения, пока оно не загрузилось — заглушка 4:3. */
+@Composable
+private fun PaintingHero(item: Item, onZoom: () -> Unit) {
+    val url by produceState(Kvartet.media.cachedArtworkUrl(item), item.id) {
+        if (value == null) value = Kvartet.media.artworkUrl(item)
+    }
+    var ratio by remember(item.id) { mutableStateOf<Float?>(null) }
+    Box(
+        Modifier.fillMaxWidth()
+            .aspectRatio((ratio ?: 1.3f).coerceIn(0.65f, 2.4f))
+            .clip(RoundedCornerShape(14.dp))
+            .background(Palette.hairline)
+            .clickable(onClick = onZoom),
+    ) {
+        if (ratio == null) Placeholder(item, showsTitle = false, Modifier.fillMaxSize())
+        url?.let {
+            AsyncImage(
+                model = it,
+                contentDescription = item.title,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize(),
+                onSuccess = { success ->
+                    val image = success.result.drawable
+                    if (image.intrinsicWidth > 0 && image.intrinsicHeight > 0) {
+                        ratio = image.intrinsicWidth.toFloat() / image.intrinsicHeight
+                    }
+                },
+            )
+        }
+    }
+}
+
 @Composable
 private fun Hero(item: Item, onZoom: () -> Unit) {
     when (item.kind) {
-        ItemKind.PAINTING -> Artwork(
-            item,
-            Modifier.fillMaxWidth().heightIn(min = 220.dp).aspectRatio(1.3f)
-                .clip(RoundedCornerShape(14.dp)).clickable(onClick = onZoom),
-            contentScale = ContentScale.Fit,
-            showsTitle = false,
-        )
+        ItemKind.PAINTING -> PaintingHero(item, onZoom)
         ItemKind.ALBUM -> Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             Artwork(item, Modifier.size(260.dp).clip(RoundedCornerShape(12.dp)))
         }
