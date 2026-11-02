@@ -247,6 +247,15 @@ BUNDLE_ID_PREFIX = com.ivanpetrov
 «Слушать» и «Где смотреть» в выбранных сервисах, архив, отложенное, дневник с оценками и экспортом,
 настройки, ежедневное напоминание и два виджета: «Квартет дня» (отметки прямо на экране) и «Картина дня».
 
+<p>
+<img src="docs/screenshots/android/02-today.jpg" width="180" alt="Android: выпуск дня">
+<img src="docs/screenshots/android/03-painting.jpg" width="180" alt="Android: картина">
+<img src="docs/screenshots/android/06-reader.jpg" width="180" alt="Android: читалка">
+<img src="docs/screenshots/android/07-album.jpg" width="180" alt="Android: альбом">
+</p>
+
+Скриншоты сняты автоматически в эмуляторе Pixel 6 — остальные в [docs/screenshots/android](docs/screenshots/android).
+
 ### Как установить на телефон (без компьютера с Android Studio)
 
 1. На GitHub откройте вкладку **Actions → Android build**, выберите последний зелёный запуск.
