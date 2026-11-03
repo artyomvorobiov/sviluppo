@@ -95,10 +95,6 @@ struct SettingsView: View {
                     }
                 } header: {
                     Text("Данные")
-                } footer: {
-                    if !AppGroup.isShared {
-                        Text("App Group не настроена: виджет не увидит ваши отметки. Как исправить — в README проекта.")
-                    }
                 }
 
                 Section("О приложении") {
