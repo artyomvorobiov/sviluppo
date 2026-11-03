@@ -217,6 +217,7 @@ BUNDLE_ID_PREFIX = com.ivanpetrov
 | `kvartet://item/<id>?open=reader` | Статью сразу в читалке |
 | `kvartet://item/<id>?open=look` | Медленный просмотр картины |
 | `kvartet://item/<id>?open=zoom` | Картину в увеличении |
+| `kvartet://debug/widgets?item=<id>` | Только в Debug-сборке из Xcode: виджет «Рекомендация дня» с этой рекомендацией во всех трёх размерах |
 
 ## Проверка в облаке (GitHub Actions)
 
@@ -225,10 +226,14 @@ BUNDLE_ID_PREFIX = com.ivanpetrov
 - **Android build** — при каждом коммите собирает Android-версию; готовый APK лежит в Artifacts запуска.
 - **Android screenshots** — вручную: скриншоты Android-версии из эмулятора в `docs/screenshots/android`.
 - **Screenshots** — запускается вручную (вкладка **Actions → Screenshots → Run workflow**): собирает
-  приложение, проходит по экранам в симуляторе iPhone и сохраняет скриншоты в `docs/screenshots`.
+  приложение, проходит по экранам в симуляторе iPhone и сохраняет скриншоты в `docs/screenshots`,
+  а предпросмотр виджетов — в `docs/screenshots/widgets`. Галочка «Только предпросмотр виджетов» снимает
+  только виджеты — так быстрее проверить их вёрстку.
 
-Обе проверки бесплатны для публичных репозиториев; для приватных расходуют минуты GitHub Actions
-(сборки на macOS считаются с повышающим коэффициентом).
+Все проверки бесплатны для публичных репозиториев; для приватных расходуют минуты GitHub Actions
+(минута сборки на macOS считается за десять). Когда бесплатные минуты месяца кончаются, запуски падают
+через пару секунд с сообщением «recent account payments have failed or your spending limit needs to be
+increased» — тогда либо ждите начала следующего месяца, либо включите оплату в **Settings → Billing and plans**.
 
 ## Конфиденциальность
 
