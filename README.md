@@ -165,22 +165,28 @@ BUNDLE_ID_PREFIX = com.ivanpetrov
 
 ## Публикация: TestFlight и App Store
 
+Готовые тексты для карточки, ответы на анкеты и заметка для проверяющего — в [docs/app-store.md](docs/app-store.md),
+текст политики конфиденциальности — в [docs/privacy-policy.md](docs/privacy-policy.md).
+
 1. Вступите в [Apple Developer Program](https://developer.apple.com/programs/) (99 $ в год).
 2. В [App Store Connect](https://appstoreconnect.apple.com) создайте приложение с вашим Bundle ID
    (`<BUNDLE_ID_PREFIX>.kvartet`).
-3. В Xcode выберите устройство **Any iOS Device**, затем **Product → Archive → Distribute App →
-   App Store Connect → Upload**. Перед каждой новой загрузкой увеличивайте `CURRENT_PROJECT_VERSION`
-   в `Config/Base.xcconfig` (а для новой версии — `MARKETING_VERSION`).
+3. В Xcode выберите устройство **Any iOS Device (arm64)**, затем **Product → Archive → Distribute App →
+   App Store Connect → Distribute**. Перед каждой новой загрузкой увеличивайте `CURRENT_PROJECT_VERSION`
+   в `Config/Base.xcconfig` (а для новой версии — `MARKETING_VERSION`). Манифест конфиденциальности
+   (`Shared/PrivacyInfo.xcprivacy`) уже в проекте — без него App Store Connect отклоняет сборки (ITMS-91053).
 4. Через 10–30 минут сборка появится в **TestFlight** — пригласите себя и друзей.
-5. Для App Store заполните описание, скриншоты (можно взять из `docs/screenshots`), категорию
-   и анкету о конфиденциальности: приложение не собирает данные и не следит за пользователями
-   (**Data Not Collected**), но нужна ссылка на политику конфиденциальности — подойдёт простая страница.
-6. Перед публикацией проверьте права на контент: изображения картин — свободные файлы Wikimedia Commons,
+5. На странице версии заполните тексты, добавьте скриншоты **6,9″** (1320 × 2868: симулятор iPhone Pro Max,
+   **File → Save Screen**), выберите сборку в разделе **Build**, заполните **App Review Information**.
+6. В разделах **App Information**, **App Privacy** и **Pricing and Availability** — категория, возрастной рейтинг,
+   ссылка на политику конфиденциальности, **Data Not Collected**, цена и страны.
+7. **Add for Review → Submit to App Review**. Проверка обычно занимает 1–3 дня.
+8. Перед публикацией проверьте права на контент: изображения картин — свободные файлы Wikimedia Commons,
    тексты статей принадлежат изданиям (читалка всегда ведёт на оригинал), обложки и фрагменты из iTunes
-   Search API Apple разрешает использовать для продвижения контента своих сервисов — поэтому по умолчанию
-   кнопка «Слушать» ведёт в Apple Music. Постеры и обложки, которых нет в iTunes, приложение берёт из
-   Википедии — это несвободные изображения, которые Википедия использует по правилу добросовестного
-   использования; если сомневаетесь, отключите этот запасной вариант в `MediaResolver.findArtwork`.
+   Search API Apple разрешает использовать для продвижения контента своих сервисов. Постеры и обложки, которых
+   нет в iTunes, приложение берёт из Википедии — это несвободные изображения, которые Википедия использует
+   по правилу добросовестного использования; если сомневаетесь, отключите этот запасной вариант
+   (`anyLicense` в `MediaResolver.findArtwork`).
 
 ## Как пополнять каталог
 
