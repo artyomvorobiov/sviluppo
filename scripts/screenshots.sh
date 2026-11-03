@@ -6,9 +6,13 @@ set -euo pipefail
 
 APP="$1"
 OUT="$2"
-mkdir -p "$OUT"
-rm -f "$OUT"/*.jpg
+# WIDGETS_ONLY=1 — снять только предпросмотр виджетов (быстрая проверка вёрстки).
+WIDGETS_ONLY="${WIDGETS_ONLY:-0}"
+mkdir -p "$OUT/widgets"
+[ "$WIDGETS_ONLY" = "1" ] || rm -f "$OUT"/*.jpg
+rm -f "$OUT"/widgets/*.jpg
 RAW="$(mktemp -d)"
+mkdir -p "$RAW/widgets"
 
 BUNDLE=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$APP/Info.plist")
 echo "Bundle: $BUNDLE"
@@ -53,8 +57,31 @@ shot() {
 relaunch_with() {
   xcrun simctl terminate "$UDID" "$BUNDLE" >/dev/null 2>&1 || true
   sleep 1
-  xcrun simctl launch "$UDID" "$BUNDLE" -skipOnboarding -openURL "$1" >/dev/null
+  xcrun simctl launch "$UDID" "$BUNDLE" -skipOnboarding -openURL "$1" >/dev/null </dev/null
 }
+
+# Виджет «Рекомендация дня» во всех размерах (отладочный экран kvartet://debug/widgets?item=<id>).
+widget_shots() {
+  while read -r name item wait; do
+    [ -z "$name" ] && continue
+    relaunch_with "kvartet://debug/widgets?item=$item"
+    shot "widgets/$name" "$wait"
+  done <<'EOF'
+painting-landscape painting-above-eternal-peace 14
+painting-portrait painting-cafe-terrace-at-night 14
+film film-boyhood 12
+album album-bon-iver-for-emma 12
+article article-cage-4-33 6
+EOF
+  xcrun simctl ui "$UDID" appearance dark
+  relaunch_with "kvartet://debug/widgets?item=film-boyhood"
+  shot widgets/film-dark 10
+  xcrun simctl ui "$UDID" appearance light
+}
+
+if [ "$WIDGETS_ONLY" = "1" ]; then
+  widget_shots
+else
 
 # Первый запуск — приветственный экран.
 xcrun simctl launch "$UDID" "$BUNDLE"
@@ -94,12 +121,17 @@ shot 16-painting-dark 12
 relaunch_with "kvartet://item/painting-hunters-in-the-snow?open=zoom"
 shot 17-zoom-dark 10
 
+xcrun simctl ui "$UDID" appearance light
+widget_shots
+fi
+
 # Уменьшаем и сохраняем в JPEG, чтобы не раздувать репозиторий.
-for file in "$RAW"/*.png; do
-  base=$(basename "$file" .png)
-  sips -Z 1400 -s format jpeg -s formatOptions 80 "$file" --out "$OUT/$base.jpg" >/dev/null
+for file in "$RAW"/*.png "$RAW"/widgets/*.png; do
+  [ -e "$file" ] || continue
+  base=${file#"$RAW"/}
+  sips -Z 1400 -s format jpeg -s formatOptions 80 "$file" --out "$OUT/${base%.png}.jpg" >/dev/null
 done
-ls -la "$OUT"
+ls -la "$OUT" "$OUT/widgets"
 
 kill "$LOG_PID" >/dev/null 2>&1 || true
 echo "--- Журнал приложения ---"

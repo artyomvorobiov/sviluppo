@@ -54,6 +54,13 @@ final class ImageStore {
         return image
     }
 
+    /// Исходные байты картинки: из дискового кэша или (если можно) из сети.
+    func imageData(for url: URL, allowNetwork: Bool) async -> Data? {
+        if let data = try? Data(contentsOf: fileURL(for: url)) { return data }
+        guard allowNetwork else { return nil }
+        return await data(for: url)
+    }
+
     /// Есть ли файл в дисковом кэше.
     func isCached(_ url: URL) -> Bool {
         FileManager.default.fileExists(atPath: fileURL(for: url).path)
@@ -131,6 +138,40 @@ final class ImageStore {
         let data = await task.value
         lock.withLock { inFlight[url] = nil }
         return data
+    }
+
+    /// Размер картинки в пикселях (с учётом поворота из EXIF) — без распаковки изображения.
+    static func pixelSize(of data: Data) -> CGSize? {
+        let sourceOptions = [kCGImageSourceShouldCache: false] as CFDictionary
+        guard let source = CGImageSourceCreateWithData(data as CFData, sourceOptions),
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let width = (properties[kCGImagePropertyPixelWidth] as? NSNumber)?.doubleValue,
+              let height = (properties[kCGImagePropertyPixelHeight] as? NSNumber)?.doubleValue,
+              width > 0, height > 0
+        else { return nil }
+        let orientation = (properties[kCGImagePropertyOrientation] as? NSNumber)?.intValue ?? 1
+        return (5...8).contains(orientation) ? CGSize(width: height, height: width) : CGSize(width: width, height: height)
+    }
+
+    /// Картинка ровно под рамку `size` (в точках): обрезана по центру до её пропорций
+    /// и уменьшена до `size × scale` пикселей. Для виджетов это важно: WidgetKit не показывает виджет,
+    /// если изображение по площади больше него, а лишние пиксели только тратят память.
+    static func render(_ data: Data, filling size: CGSize, scale: CGFloat) -> UIImage? {
+        guard size.width >= 1, size.height >= 1, let pixels = pixelSize(of: data) else { return nil }
+        // Сколько пикселей нужно по длинной стороне исходника, чтобы закрыть рамку без растягивания.
+        let cover = max(size.width * scale / pixels.width, size.height * scale / pixels.height)
+        let needed = min(max(pixels.width, pixels.height), max(pixels.width, pixels.height) * cover)
+        guard let image = downsample(data, maxPixel: ceil(needed)) else { return nil }
+
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = scale
+        format.opaque = false
+        let ratio = max(size.width / image.size.width, size.height / image.size.height)
+        let drawn = CGSize(width: image.size.width * ratio, height: image.size.height * ratio)
+        let origin = CGPoint(x: (size.width - drawn.width) / 2, y: (size.height - drawn.height) / 2)
+        return UIGraphicsImageRenderer(size: size, format: format).image { _ in
+            image.draw(in: CGRect(origin: origin, size: drawn))
+        }
     }
 
     /// Уменьшение без распаковки полного изображения в память (ImageIO).

@@ -25,6 +25,7 @@ struct RootView: View {
                 .environment(model)
                 .environment(prefs)
         }
+        .modifier(WidgetPreviewModifier())
         .onOpenURL { url in
             model.handle(url: url)
         }

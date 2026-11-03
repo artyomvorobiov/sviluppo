@@ -26,48 +26,6 @@ struct DaySnapshot {
     }
 }
 
-/// Изображения для виджетов: сначала из общего кэша (его наполняет приложение), потом из сети.
-enum WidgetArtwork {
-    static func cachedImage(for item: Item, maxPixel: CGFloat) async -> UIImage? {
-        guard let url = await MediaResolver.shared.cachedArtworkURL(for: item) else { return nil }
-        return ImageStore.shared.cachedImage(for: url, maxPixel: maxPixel)
-    }
-
-    static func image(for item: Item, maxPixel: CGFloat) async -> UIImage? {
-        if let cached = await cachedImage(for: item, maxPixel: maxPixel) { return cached }
-        guard let url = await MediaResolver.shared.artworkURL(for: item) else { return nil }
-        return await ImageStore.shared.image(for: url, maxPixel: maxPixel)
-    }
-}
-
-/// Картинка в виджете: в тонированном режиме iOS 18+ окрашивается в цвет экрана «Домой».
-struct WidgetPhoto: View {
-    let image: UIImage
-
-    var body: some View {
-        if #available(iOS 18.0, *) {
-            Image(uiImage: image)
-                .resizable()
-                .widgetAccentedRenderingMode(.accentedDesaturated)
-                .scaledToFill()
-        } else {
-            Image(uiImage: image)
-                .resizable()
-                .scaledToFill()
-        }
-    }
-}
-
-/// Значок «готово» поверх изображения.
-struct DoneBadge: View {
-    var body: some View {
-        Image(systemName: "checkmark.circle.fill")
-            .font(.system(size: 18, weight: .semibold))
-            .symbolRenderingMode(.palette)
-            .foregroundStyle(Color.white, Color.black.opacity(0.35))
-    }
-}
-
 extension View {
     /// Фон виджета; для экрана блокировки — системная подложка.
     @ViewBuilder

@@ -26,6 +26,8 @@ final class AppModel {
     /// (kvartet://item/<id>?open=reader|look|zoom).
     var pendingOpen: PendingOpen?
     var isSettingsPresented = false
+    /// Отладочный предпросмотр виджета для рекомендации (kvartet://debug/widgets?item=<id>, только Debug-сборка).
+    var debugWidgetItemID: String?
 
     private let store = UserStateStore.shared
     @ObservationIgnored private var lastRemoteCheck: Date?
@@ -237,6 +239,13 @@ final class AppModel {
     /// kvartet://item/<id> и kvartet://item/<id>?open=reader|look|zoom.
     func handle(url: URL) {
         guard url.scheme == AppConfig.urlScheme else { return }
+        #if DEBUG
+        if url.host == "debug" {
+            debugWidgetItemID = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+                .queryItems?.first(where: { $0.name == "item" })?.value
+            return
+        }
+        #endif
         let parts = url.pathComponents.filter { $0 != "/" }
         switch url.host {
         case "item":
