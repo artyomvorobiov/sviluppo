@@ -114,3 +114,21 @@ App Store Connect спросит, показывает ли приложение
 **Pricing and Availability** → цена **Free** (или своя), страны — все или выбранные. Для Евросоюза
 App Store Connect спросит, являетесь ли вы торговцем (Digital Services Act): для бесплатного личного
 проекта обычно отвечают «не торговец»; если выберете «торговец», ваши контакты будут показаны в карточке.
+
+## Ответ на запрос App Review (Guideline 2.1 — Information Needed)
+
+Вставьте в **App Review Information → Notes** (видео — в **Attachment** там же или ссылкой):
+
+```
+1. Screen recording: attached (recorded on iPhone, latest iOS). It starts with launching the app from the Home Screen and shows onboarding, today's issue, a painting (slow looking, zoom), an article in the reader, an album (30-second preview), a film (trailer), marking an item as done with a rating and note, the journal, the archive, settings, and the Home Screen widgets. The app has no accounts, no login, no user-generated content shared with others, and no paid content or in-app purchases.
+
+2. Purpose and audience: Kvartet is a daily cultural digest for adults who want to learn about art, music, film and history in a few minutes a day. Every day it offers one theme and four curated recommendations that explore it: a painting, an article, an album and a film, each with a short explanation of what it is and why it matters. It replaces endless feeds with a small, finite daily issue and helps users keep a personal journal of what they have looked at, read, listened to and watched.
+
+3. Setup: no login or setup is needed. Open the app, tap "Начать" (Start) on the welcome screen, and today's issue appears. Tap any card to open it: "Медленный просмотр" (slow looking) for paintings, "Читать" (read) for articles, the play button for album previews, "Трейлер" for films. Tap "Отметить" to mark an item as done. Tabs: Today, Archive, Journal. Widgets: long-press the Home Screen → "+" → "Квартет".
+
+4. External services: Wikipedia / Wikimedia Commons API (painting images, article texts), iTunes Search API by Apple (album covers, 30-second previews, film artwork and trailers, links to Apple Music / iTunes Store), and publishers' public web pages for articles (shown in a reader view with the source named and a link to the original). Links "Listen" / "Where to watch" open the music or video service the user chooses. No authentication, payment, analytics, advertising or AI services are used. The curated texts are written by us and bundled with the app.
+
+5. Regions: the app works the same in all regions. The interface and content are in Russian. Availability of some iTunes previews and of the external music and video services depends on the user's country, as on any device.
+
+6. Third-party material: paintings are public-domain or freely licensed files from Wikimedia Commons; Wikipedia texts are under CC BY-SA and attributed; covers, previews and trailers are provided by the iTunes Search API for promoting content in Apple's stores and link to it; articles are opened from their public pages with attribution and a link to the publisher. The app does not operate in a regulated industry.
+```
