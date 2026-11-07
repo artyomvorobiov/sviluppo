@@ -10,6 +10,8 @@ struct SettingsView: View {
     @State private var notificationsDenied = false
     @State private var confirmReset = false
     @State private var cacheCleared = false
+    @State private var versionTaps = 0
+    @State private var confirmUnlock = false
 
     var body: some View {
         @Bindable var prefs = prefs
@@ -99,6 +101,15 @@ struct SettingsView: View {
 
                 Section("О приложении") {
                     LabeledContent("Версия", value: appVersion)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            // Скрытая функция: пять нажатий на версию открывают все выпуски.
+                            versionTaps += 1
+                            if versionTaps >= 5 {
+                                versionTaps = 0
+                                if !model.allIssuesUnlocked { confirmUnlock = true }
+                            }
+                        }
                     LabeledContent("Выпусков в каталоге", value: "\(model.library.issues.count)")
                     Text("Изображения картин — Wikimedia Commons (общественное достояние). Обложки, фрагменты и трейлеры — iTunes Search API. Режим чтения — Mozilla Readability (Apache 2.0).")
                         .font(.footnote)
@@ -114,6 +125,13 @@ struct SettingsView: View {
             }
             .onChange(of: prefs.reminderTime) { _, _ in
                 reschedule()
+            }
+            .confirmationDialog("Открыть все выпуски?", isPresented: $confirmUnlock, titleVisibility: .visible) {
+                Button("Открыть все \(model.library.issues.count)") {
+                    model.unlockAllIssues()
+                }
+            } message: {
+                Text("Все темы каталога появятся в архиве. Сегодняшний выпуск, отметки и дневник не изменятся. Вернуть как было можно кнопкой «Начать сначала».")
             }
             .confirmationDialog("Начать сначала?", isPresented: $confirmReset, titleVisibility: .visible) {
                 Button("Стереть отметки и дневник", role: .destructive) {

@@ -119,6 +119,22 @@ final class AppModel {
         journalPath = []
     }
 
+    /// Скрытая функция: открыть в архиве все выпуски каталога. Сегодняшний выпуск не меняется —
+    /// день начала просто сдвигается на полный круг каталога назад. Отметки остаются.
+    func unlockAllIssues() {
+        let count = library.issues.count
+        guard count > 0 else { return }
+        let index = DayPlanner(library: library, startDay: startDay).index(for: today) % count
+        let newStart = Days.adding(days: -(index + count), to: Days.startOfDay(today))
+        mutate { $0.startDay = Days.key(for: newStart) }
+        archivePath = []
+    }
+
+    /// Открыты ли уже все выпуски.
+    var allIssuesUnlocked: Bool {
+        Days.between(startDay, today) >= library.issues.count
+    }
+
     private func mutate(_ change: (inout UserState) -> Void) {
         state = store.update(change)
         WidgetCenter.shared.reloadAllTimelines()
