@@ -94,29 +94,33 @@ def check_online(items: list[dict], errors: list[str], warnings: list[str]) -> N
                     )
             time.sleep(2)
 
-    files = {}
+    # Файлы из поля image вида https://<сайт>/wiki/Special:FilePath/<имя>[?width=…]: спрашиваем тот же сайт,
+    # он видит и свои файлы, и файлы Commons.
+    by_host: dict[str, list[tuple[str, str]]] = {}
     for item in items:
         image = item.get("image", "")
         if "Special:FilePath/" in image:
-            files[item["id"]] = urllib.parse.unquote(image.split("Special:FilePath/", 1)[1]).replace("_", " ")
-    names = list(files.items())
-    for start in range(0, len(names), 40):
-        chunk = names[start:start + 40]
-        params = {
-            "action": "query", "format": "json", "formatversion": "2", "prop": "imageinfo",
-            "iiprop": "size", "titles": "|".join(f"File:{name}" for _, name in chunk),
-        }
-        query = fetch_json("https://commons.wikimedia.org/w/api.php?" + urllib.parse.urlencode(params))["query"]
-        renamed = {n["from"]: n["to"] for n in query.get("normalized", [])}
-        pages = {page["title"]: page for page in query.get("pages", [])}
-        for item_id, name in chunk:
-            title = renamed.get(f"File:{name}", f"File:{name}")
-            info = (pages.get(title, {}).get("imageinfo") or [{}])[0]
-            if not info:
-                errors.append(f"{item_id}: файла «{name}» нет на Wikimedia Commons")
-            elif max(info.get("width", 0), info.get("height", 0)) < MIN_PAINTING_PIXELS:
-                warnings.append(f"{item_id}: файл «{name}» всего {info.get('width')}×{info.get('height')}")
-        time.sleep(2)
+            parsed = urllib.parse.urlparse(image)
+            name = urllib.parse.unquote(parsed.path.split("Special:FilePath/", 1)[1]).replace("_", " ")
+            by_host.setdefault(parsed.netloc, []).append((item["id"], name))
+    for host, names in by_host.items():
+        for start in range(0, len(names), 40):
+            chunk = names[start:start + 40]
+            params = {
+                "action": "query", "format": "json", "formatversion": "2", "prop": "imageinfo",
+                "iiprop": "size", "titles": "|".join(f"File:{name}" for _, name in chunk),
+            }
+            query = fetch_json(f"https://{host}/w/api.php?" + urllib.parse.urlencode(params))["query"]
+            renamed = {n["from"]: n["to"] for n in query.get("normalized", [])}
+            pages = {page["title"]: page for page in query.get("pages", [])}
+            for item_id, name in chunk:
+                title = renamed.get(f"File:{name}", f"File:{name}")
+                info = (pages.get(title, {}).get("imageinfo") or [{}])[0]
+                if not info:
+                    errors.append(f"{item_id}: файла «{name}» нет на {host}")
+                elif max(info.get("width", 0), info.get("height", 0)) < MIN_PAINTING_PIXELS:
+                    warnings.append(f"{item_id}: файл «{name}» всего {info.get('width')}×{info.get('height')}")
+            time.sleep(2)
 
 
 def main() -> int:
