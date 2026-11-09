@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """Проверка каталога «Квартета» (Shared/Resources/catalog.json).
 
-Запуск:  python3 scripts/validate_catalog.py [путь/к/catalog.json]
+Запуск:  python3 scripts/validate_catalog.py [путь/к/catalog.json] [--online]
+
+С флагом --online скрипт ещё и спрашивает Википедию: существуют ли статьи из поля wiki,
+есть ли у картин свободное изображение и достаточно ли оно крупное (нужен интернет).
 
 Ошибки (exit code 1): битый JSON, нет обязательных полей, повторяющиеся id,
 неизвестные поля (часто это опечатка), неверные типы.
@@ -11,6 +14,10 @@
 import json
 import re
 import sys
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
 from collections import Counter
 from pathlib import Path
 
@@ -30,8 +37,92 @@ REQUIRED_ITEM = ["id", "kind", "title", "creator", "summary"]
 ISSUE_FIELDS = {"id": str, "theme": str, "intro": str, "items": list}
 
 
+USER_AGENT = "KvartetCatalogCheck/1.0 (https://github.com/artyomvorobiov/sviluppo)"
+# Картина меньше этого по длинной стороне будет выглядеть мыльно на экране телефона.
+MIN_PAINTING_PIXELS = 1500
+
+
+def fetch_json(url: str) -> dict:
+    """GET с паузами при ответе 429 (Википедия ограничивает частые запросы)."""
+    for attempt in range(6):
+        try:
+            request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+            with urllib.request.urlopen(request, timeout=30) as response:
+                return json.load(response)
+        except urllib.error.HTTPError as exc:
+            if exc.code != 429:
+                raise
+            time.sleep(15 * (attempt + 1))
+    raise RuntimeError("Википедия отвечает «слишком много запросов» — попробуйте позже")
+
+
+def check_online(items: list[dict], errors: list[str], warnings: list[str]) -> None:
+    """Статьи из поля wiki существуют, у картин есть крупное свободное изображение; файлы из image доступны."""
+    by_lang: dict[str, list[tuple[dict, str]]] = {}
+    for item in items:
+        if item.get("wiki") and WIKI.match(item["wiki"]):
+            lang, title = item["wiki"].split(":", 1)
+            by_lang.setdefault(lang, []).append((item, title.replace("_", " ")))
+    for lang, entries in by_lang.items():
+        for start in range(0, len(entries), 40):
+            chunk = entries[start:start + 40]
+            params = {
+                "action": "query", "format": "json", "formatversion": "2", "redirects": "1",
+                "prop": "pageimages", "piprop": "thumbnail|original", "pithumbsize": "2560",
+                "pilicense": "free", "titles": "|".join(title for _, title in chunk),
+            }
+            query = fetch_json(f"https://{lang}.wikipedia.org/w/api.php?" + urllib.parse.urlencode(params))["query"]
+            renamed = {n["from"]: n["to"] for n in query.get("normalized", []) + query.get("redirects", [])}
+            pages = {page["title"]: page for page in query.get("pages", [])}
+            for item, title in chunk:
+                while title in renamed:
+                    title = renamed[title]
+                page = pages.get(title)
+                label = item["id"]
+                if not page or page.get("missing"):
+                    errors.append(f"{label}: статьи {item['wiki']} нет в Википедии")
+                    continue
+                if item["kind"] != "painting" or item.get("image"):
+                    continue
+                original = page.get("original") or {}
+                if not page.get("thumbnail"):
+                    errors.append(f"{label}: у статьи {item['wiki']} нет свободного изображения — укажите image")
+                elif max(original.get("width", 0), original.get("height", 0)) < MIN_PAINTING_PIXELS:
+                    warnings.append(
+                        f"{label}: изображение всего {original.get('width')}×{original.get('height')} — "
+                        "поищите файл крупнее на Commons и укажите его в image"
+                    )
+            time.sleep(2)
+
+    files = {}
+    for item in items:
+        image = item.get("image", "")
+        if "Special:FilePath/" in image:
+            files[item["id"]] = urllib.parse.unquote(image.split("Special:FilePath/", 1)[1]).replace("_", " ")
+    names = list(files.items())
+    for start in range(0, len(names), 40):
+        chunk = names[start:start + 40]
+        params = {
+            "action": "query", "format": "json", "formatversion": "2", "prop": "imageinfo",
+            "iiprop": "size", "titles": "|".join(f"File:{name}" for _, name in chunk),
+        }
+        query = fetch_json("https://commons.wikimedia.org/w/api.php?" + urllib.parse.urlencode(params))["query"]
+        renamed = {n["from"]: n["to"] for n in query.get("normalized", [])}
+        pages = {page["title"]: page for page in query.get("pages", [])}
+        for item_id, name in chunk:
+            title = renamed.get(f"File:{name}", f"File:{name}")
+            info = (pages.get(title, {}).get("imageinfo") or [{}])[0]
+            if not info:
+                errors.append(f"{item_id}: файла «{name}» нет на Wikimedia Commons")
+            elif max(info.get("width", 0), info.get("height", 0)) < MIN_PAINTING_PIXELS:
+                warnings.append(f"{item_id}: файл «{name}» всего {info.get('width')}×{info.get('height')}")
+        time.sleep(2)
+
+
 def main() -> int:
-    path = Path(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_PATH
+    args = [arg for arg in sys.argv[1:] if not arg.startswith("--")]
+    online = "--online" in sys.argv[1:]
+    path = Path(args[0]) if args else DEFAULT_PATH
     errors: list[str] = []
     warnings: list[str] = []
 
@@ -138,6 +229,13 @@ def main() -> int:
     for item_id, count in item_ids.items():
         if count > 1:
             errors.append(f"id рекомендации «{item_id}» повторяется {count} раз(а)")
+
+    if online:
+        all_items = [item for issue in issues if isinstance(issue, dict) for item in issue.get("items", []) if isinstance(item, dict)]
+        try:
+            check_online(all_items, errors, warnings)
+        except Exception as exc:  # noqa: BLE001
+            errors.append(f"проверка в Википедии не удалась: {exc}")
 
     repeated = [f"{creator} ({kind}) ×{n}" for (kind, creator), n in creators.items() if n > 2 and kind != "article"]
     if repeated:

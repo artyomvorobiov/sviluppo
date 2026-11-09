@@ -49,15 +49,20 @@ actor MediaResolver {
     /// Обложка, постер или изображение картины.
     func artworkURL(for item: Item) async -> URL? {
         if let direct = item.image.flatMap(URL.init(string:)) { return direct }
-        let value = await resolve(key: item.id + "|art") { await Self.findArtwork(for: item) }
+        let value = await resolve(key: Self.artKey(for: item)) { await Self.findArtwork(for: item) }
         return value.flatMap(URL.init(string:))
+    }
+
+    /// Ключ кэша включает статью Википедии: если в каталоге её исправили, картинка ищется заново.
+    private static func artKey(for item: Item) -> String {
+        "\(item.id)|art|\(item.wiki ?? "")"
     }
 
     /// Только из кэша, без сети.
     func cachedArtworkURL(for item: Item) -> URL? {
         if let direct = item.image.flatMap(URL.init(string:)) { return direct }
         loadIfNeeded()
-        return cache[item.id + "|art"]?.value.flatMap(URL.init(string:))
+        return cache[Self.artKey(for: item)]?.value.flatMap(URL.init(string:))
     }
 
     /// Для альбома — 30-секундный фрагмент ключевого трека, для фильма — трейлер.
@@ -72,7 +77,7 @@ actor MediaResolver {
         guard let wiki = item.wiki else { return nil }
         let fallback = item.wikipediaURL
         if wiki.hasPrefix("ru:") { return fallback }
-        let value = await resolve(key: item.id + "|wiki") {
+        let value = await resolve(key: "\(item.id)|wiki|\(wiki)") {
             switch await Self.wikipediaInfo(wiki) {
             case .some(let info): return info.ruURL.map(Lookup.found) ?? .notFound(retryAfter: Self.retryNotFound)
             case .none: return .failed

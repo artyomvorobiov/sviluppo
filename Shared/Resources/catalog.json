@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updated": "2026-11-02",
+  "updated": "2026-11-09",
   "issues": [
     {
       "id": "silence",
@@ -1659,7 +1659,7 @@
             "Вильгельм Хаммерсхёй — «Интерьер. Страндгаде, 30» (1901)",
             "Сальвадор Дали — «Фигура у окна» (1925)"
           ],
-          "wiki": "en:Woman_at_a_Window_(Friedrich)"
+          "wiki": "ru:Женщина_у_окна"
         },
         {
           "id": "article-waiting-for-godot",
@@ -1963,7 +1963,7 @@
             "Борис Кустодиев — «Русская Венера» (1925–1926)",
             "Питер Брейгель Старший — «Крестьянская свадьба» (1567)"
           ],
-          "wiki": "en:Merchant's_Wife_at_Tea"
+          "wiki": "ru:Купчиха_за_чаем"
         },
         {
           "id": "article-plato-symposium",
@@ -4003,7 +4003,7 @@
             "Поль Синьяк — «Портрет Феликса Фенеона» (1890)",
             "Пьер Огюст Ренуар — «Завтрак гребцов» (1881)"
           ],
-          "wiki": "ru:Воскресный_день_на_острове_Гранд-Жатт"
+          "wiki": "en:A_Sunday_Afternoon_on_the_Island_of_La_Grande_Jatte"
         },
         {
           "id": "article-year-without-summer",
@@ -5929,7 +5929,7 @@
             "Ян Вермеер — «Девушка, читающая письмо у открытого окна» (ок. 1657–1659)",
             "Пьер Огюст Ренуар — «Чтение» (ок. 1891)"
           ],
-          "wiki": "en:Young_Girl_Reading"
+          "wiki": "en:A_Young_Girl_Reading"
         },
         {
           "id": "article-library-of-alexandria",
@@ -6500,7 +6500,7 @@
             "«Песни со второго этажа», Рой Андерссон (2000)"
           ],
           "search": "Fallen Leaves",
-          "wiki": "en:Fallen_Leaves_(2023_film)"
+          "wiki": "en:Fallen_Leaves_(film)"
         }
       ]
     },

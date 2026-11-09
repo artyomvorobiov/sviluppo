@@ -82,13 +82,16 @@ class MediaResolver(context: Context) {
     /** Обложка, постер или изображение картины. */
     suspend fun artworkUrl(item: Item): String? {
         item.image?.let { return it }
-        return resolve(item.id + "|art") { findArtwork(item) }
+        return resolve(artKey(item)) { findArtwork(item) }
     }
+
+    /** Ключ кэша включает статью Википедии: если в каталоге её исправили, картинка ищется заново. */
+    private fun artKey(item: Item) = "${item.id}|art|${item.wiki.orEmpty()}"
 
     /** Только из кэша, без сети. */
     fun cachedArtworkUrl(item: Item): String? {
         item.image?.let { return it }
-        return synchronized(cache) { cache[item.id + "|art"]?.value }
+        return synchronized(cache) { cache[artKey(item)]?.value }
     }
 
     /** Альбом — 30 секунд ключевого трека, фильм — трейлер. */
@@ -102,7 +105,7 @@ class MediaResolver(context: Context) {
         val wiki = item.wiki ?: return null
         val fallback = item.wikipediaUrl
         if (wiki.startsWith("ru:")) return fallback
-        val value = resolve(item.id + "|wiki") {
+        val value = resolve("${item.id}|wiki|$wiki") {
             val info = wikipediaInfo(wiki) ?: return@resolve Lookup.Failed
             info.ruUrl?.let { Lookup.Found(it) } ?: Lookup.NotFound(RETRY_NOT_FOUND)
         }
