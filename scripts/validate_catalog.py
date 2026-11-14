@@ -234,6 +234,27 @@ def main() -> int:
         if count > 1:
             errors.append(f"id рекомендации «{item_id}» повторяется {count} раз(а)")
 
+    # Выпуски выдаются по порядку от дня первого запуска, а отметки привязаны к id:
+    # в опубликованном каталоге выпуски можно только добавлять в конец, ничего не переставляя и не удаляя.
+    if path.resolve() != DEFAULT_PATH.resolve() and DEFAULT_PATH.exists():
+        try:
+            base = json.loads(DEFAULT_PATH.read_text(encoding="utf-8"))
+            base_issues = [issue.get("id") for issue in base.get("issues", [])]
+            new_issues = [issue.get("id") for issue in issues if isinstance(issue, dict)]
+            if new_issues[:len(base_issues)] != base_issues:
+                errors.append(
+                    "порядок выпусков отличается от встроенного каталога: выпуски можно только "
+                    "добавлять в конец — иначе у пользователей сдвинутся дни"
+                )
+            new_item_ids = {item.get("id") for issue in issues if isinstance(issue, dict) for item in issue.get("items", [])}
+            lost = [item["id"] for issue in base.get("issues", []) for item in issue.get("items", []) if item["id"] not in new_item_ids]
+            if lost:
+                errors.append("пропали рекомендации из встроенного каталога (отметки к ним потеряются): " + ", ".join(lost[:10]))
+            if (catalog.get("updated") or "") < (base.get("updated") or ""):
+                errors.append("дата updated старше, чем у встроенного каталога, — приложение проигнорирует этот файл")
+        except Exception as exc:  # noqa: BLE001
+            warnings.append(f"не удалось сравнить со встроенным каталогом: {exc}")
+
     if online:
         all_items = [item for issue in issues if isinstance(issue, dict) for item in issue.get("items", []) if isinstance(item, dict)]
         try:

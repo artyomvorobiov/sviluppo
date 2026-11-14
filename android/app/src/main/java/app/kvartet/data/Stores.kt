@@ -15,12 +15,53 @@ val KvartetJson = Json {
     encodeDefaults = true
 }
 
-/** Каталог выпусков из assets/catalog.json (тот же файл, что и в iOS-версии). */
+/**
+ * Каталог выпусков: встроенный (assets/catalog.json — тот же файл, что и в iOS-версии)
+ * или скачанный с [REMOTE_URL], если он не старше встроенного.
+ */
 object CatalogLoader {
+    const val REMOTE_URL = "https://raw.githubusercontent.com/artyomvorobiov/kvartet-catalog/main/catalog.json"
+    private const val REMOTE_FILE = "catalog-remote.json"
+
     fun load(context: Context): Catalog {
-        val text = context.assets.open("catalog.json").bufferedReader().use { it.readText() }
-        return KvartetJson.decodeFromString(Catalog.serializer(), text)
+        val bundled = decode(context.assets.open("catalog.json").bufferedReader().use { it.readText() })
+            ?: Catalog(SUPPORTED_SCHEMA, null, emptyList())
+        val remote = runCatching { File(context.filesDir, REMOTE_FILE).readText() }.getOrNull()?.let(::decode)
+        return if (remote != null && (remote.updated ?: "") >= (bundled.updated ?: "")) remote else bundled
     }
+
+    /**
+     * Скачивает удалённый каталог. Новые выпуски появятся при следующем запуске приложения.
+     * Возвращает true, если файл изменился.
+     */
+    fun refreshRemote(context: Context, userAgent: String): Boolean {
+        val text = try {
+            val connection = java.net.URL(REMOTE_URL).openConnection() as java.net.HttpURLConnection
+            connection.connectTimeout = 15_000
+            connection.readTimeout = 20_000
+            connection.useCaches = false
+            connection.setRequestProperty("User-Agent", userAgent)
+            if (connection.responseCode != 200) {
+                connection.disconnect()
+                return false
+            }
+            connection.inputStream.bufferedReader().use { it.readText() }
+        } catch (e: Exception) {
+            return false
+        }
+        if (decode(text) == null) return false
+        val file = File(context.filesDir, REMOTE_FILE)
+        if (file.exists() && file.readText() == text) return false
+        val temp = File(context.filesDir, "$REMOTE_FILE.tmp")
+        temp.writeText(text)
+        return temp.renameTo(file)
+    }
+
+    private fun decode(text: String): Catalog? = runCatching {
+        KvartetJson.decodeFromString(Catalog.serializer(), text)
+    }.getOrNull()?.takeIf { it.schemaVersion <= SUPPORTED_SCHEMA && it.issues.isNotEmpty() }
+
+    private const val SUPPORTED_SCHEMA = 1
 }
 
 /** Какой выпуск в какой день: № 1 — в день первого запуска, дальше по кругу. */

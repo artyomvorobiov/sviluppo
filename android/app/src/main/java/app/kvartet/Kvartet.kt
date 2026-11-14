@@ -13,6 +13,7 @@ import app.kvartet.data.Streaks
 import app.kvartet.data.UserState
 import app.kvartet.data.UserStore
 import app.kvartet.media.MediaResolver
+import app.kvartet.media.USER_AGENT
 import app.kvartet.widget.Widgets
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -102,6 +103,17 @@ object Kvartet {
             Widgets.updateAll(appContext)
         }
         prefetchUpcomingArtwork()
+        refreshRemoteCatalog()
+    }
+
+    @Volatile private var lastRemoteCheck = 0L
+
+    /** Раз в 6 часов проверяет удалённый каталог; новые выпуски появятся при следующем запуске. */
+    private fun refreshRemoteCatalog() {
+        val now = System.currentTimeMillis()
+        if (now - lastRemoteCheck < 6 * 3600 * 1000L) return
+        lastRemoteCheck = now
+        scope.launch(Dispatchers.IO) { CatalogLoader.refreshRemote(appContext, USER_AGENT) }
     }
 
     // endregion
