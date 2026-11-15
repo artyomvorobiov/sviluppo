@@ -5,6 +5,7 @@ final class ContentLibrary {
     let catalog: Catalog
     private let itemsByID: [String: Item]
     private let issuesByItemID: [String: Issue]
+    private let dayNotes: [String: DayNote]
 
     var issues: [Issue] { catalog.issues }
 
@@ -20,6 +21,12 @@ final class ContentLibrary {
         }
         itemsByID = items
         issuesByItemID = issues
+        dayNotes = Dictionary((catalog.days ?? []).map { ($0.date, $0) }, uniquingKeysWith: { first, _ in first })
+    }
+
+    /// «В этот день» для календарной даты (nil — на этот день записи нет).
+    func dayNote(for date: Date) -> DayNote? {
+        dayNotes[DayNote.key(for: date)]
     }
 
     func item(id: String) -> Item? { itemsByID[id] }

@@ -28,6 +28,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,6 +40,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.kvartet.Kvartet
+import app.kvartet.data.DayNote
 import app.kvartet.data.Format
 import app.kvartet.data.Item
 import app.kvartet.data.ItemKind
@@ -59,6 +62,12 @@ fun IssueScreen(
     val done = state.completions.keys
     val doneCount = items.count { it.id in done }
     val streak = Kvartet.currentStreak(state)
+    val dayNote = remember(date) { Kvartet.dayNote(date) }
+    var shownNote by remember { mutableStateOf<DayNote?>(null) }
+
+    shownNote?.let { note ->
+        DayNoteDialog(note, date, onOpenItem = { shownNote = null; onOpenItem(it) }, onDismiss = { shownNote = null })
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -97,6 +106,10 @@ fun IssueScreen(
                     Text(line, color = Palette.muted, fontSize = 13.sp)
                 }
             }
+        }
+        // «В этот день» привязано к календарю, а не к номеру выпуска.
+        dayNote?.let { note ->
+            item(key = "day-note") { DayNoteCard(note, onClick = { shownNote = note }) }
         }
         items(items, key = { it.id }) { item ->
             ItemCard(item, isDone = item.id in done, onClick = { onOpenItem(item) })

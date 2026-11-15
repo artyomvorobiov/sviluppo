@@ -8,6 +8,7 @@ struct IssueView: View {
 
     @Environment(AppModel.self) private var model
     @Environment(Preferences.self) private var prefs
+    @State private var shownNote: DayNote?
 
     var body: some View {
         let issue = model.issue(for: date)
@@ -24,6 +25,16 @@ struct IssueView: View {
                     doneCount: doneCount,
                     streak: isToday ? model.currentStreak : 0
                 )
+
+                // «В этот день» привязано к календарю, а не к номеру выпуска.
+                if let note = model.library.dayNote(for: date) {
+                    Button {
+                        shownNote = note
+                    } label: {
+                        DayNoteCard(note: note)
+                    }
+                    .buttonStyle(.plain)
+                }
 
                 ForEach(items) { item in
                     NavigationLink(value: Route.item(item.id)) {
@@ -63,6 +74,10 @@ struct IssueView: View {
             SettingsView()
                 .environment(model)
                 .environment(prefs)
+        }
+        .sheet(item: $shownNote) { note in
+            DayNoteSheet(note: note, date: date)
+                .environment(model)
         }
         .sensoryFeedback(.success, trigger: doneCount) { old, new in new > old }
     }

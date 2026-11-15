@@ -141,7 +141,50 @@ data class Catalog(
     val schemaVersion: Int,
     val updated: String? = null,
     val issues: List<Issue>,
+    /** Рубрика «В этот день» (необязательная). */
+    val days: List<DayNote>? = null,
 )
+
+/**
+ * «В этот день»: короткая история, привязанная к календарной дате ("11-15").
+ * У всех пользователей в один день она одна и та же.
+ */
+@Serializable
+data class DayNote(
+    val date: String,
+    /** birthday, memory, premiere, event. */
+    val kind: String? = null,
+    val year: String? = null,
+    val title: String,
+    val text: String,
+    /** Что можно сделать сегодня. */
+    val tip: String? = null,
+    val wiki: String? = null,
+    val image: String? = null,
+    /** id связанной рекомендации из каталога. */
+    val item: String? = null,
+) {
+    val label: String
+        get() {
+            val base = when (kind) {
+                "birthday" -> "День рождения"
+                "memory" -> "День памяти"
+                "premiere" -> "Премьера"
+                else -> "В этот день"
+            }
+            return if (year.isNullOrEmpty()) base else "$base · $year"
+        }
+
+    /** Рекомендация-«обёртка»: картинка и русская статья ищутся так же, как у картин. */
+    val artworkItem: Item?
+        get() = if (wiki == null && image == null) null else Item(
+            id = "day-$date", kind = ItemKind.PAINTING, title = title, creator = "", summary = text, wiki = wiki, image = image,
+        )
+
+    companion object {
+        fun key(date: java.time.LocalDate): String = "%02d-%02d".format(date.monthValue, date.dayOfMonth)
+    }
+}
 
 /** Отметка «изучено»: когда, оценка 1–5 и заметка. */
 @Serializable

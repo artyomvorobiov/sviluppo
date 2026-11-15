@@ -35,6 +35,10 @@ ITEM_FIELDS = {
 }
 REQUIRED_ITEM = ["id", "kind", "title", "creator", "summary"]
 ISSUE_FIELDS = {"id": str, "theme": str, "intro": str, "items": list}
+DAY_FIELDS = ["date", "kind", "year", "title", "text", "tip", "wiki", "image", "item"]
+DAY_KINDS = ["birthday", "memory", "premiere", "event"]
+DAY_DATE = re.compile(r"^(\d{2})-(\d{2})$")
+DAYS_IN_MONTH = [0, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 
 
 USER_AGENT = "KvartetCatalogCheck/1.0 (https://github.com/artyomvorobiov/sviluppo)"
@@ -227,6 +231,44 @@ def main() -> int:
             if len(item.get("summary", "")) > 700:
                 warnings.append(f"{label}: summary длиннее 700 знаков")
 
+    # Рубрика «В этот день».
+    days = catalog.get("days", [])
+    if not isinstance(days, list):
+        errors.append("«days» должен быть списком")
+        days = []
+    seen_days: set[str] = set()
+    all_item_ids = set(item_ids)
+    for index, note in enumerate(days):
+        where = f"days[{index}]"
+        if not isinstance(note, dict):
+            errors.append(f"{where}: должен быть объектом")
+            continue
+        where = f"days «{note.get('date', index)}»"
+        for key, value in note.items():
+            if key not in DAY_FIELDS:
+                errors.append(f"{where}: неизвестное поле «{key}»")
+            elif not isinstance(value, str):
+                errors.append(f"{where}: поле «{key}» должно быть строкой")
+        for key in ("date", "title", "text"):
+            if not note.get(key):
+                errors.append(f"{where}: нет обязательного поля «{key}»")
+        date = note.get("date", "")
+        if isinstance(date, str) and date:
+            match = DAY_DATE.match(date)
+            if not match or not (1 <= int(match[1]) <= 12 and 1 <= int(match[2]) <= DAYS_IN_MONTH[int(match[1])]):
+                errors.append(f"{where}: date в формате «ММ-ДД», например «11-15»")
+            elif date in seen_days:
+                errors.append(f"{where}: на этот день уже есть запись")
+            seen_days.add(date)
+        if note.get("kind") and note["kind"] not in DAY_KINDS:
+            errors.append(f"{where}: kind — один из {', '.join(DAY_KINDS)}")
+        if isinstance(note.get("wiki"), str) and not WIKI.match(note["wiki"]):
+            errors.append(f"{where}: wiki в формате «ru:Название_статьи»")
+        if note.get("item") and note["item"] not in all_item_ids:
+            errors.append(f"{where}: рекомендации «{note['item']}» нет в каталоге")
+        if isinstance(note.get("text"), str) and len(note["text"]) > 450:
+            warnings.append(f"{where}: text длиннее 450 знаков")
+
     for issue_id, count in issue_ids.items():
         if count > 1:
             errors.append(f"id выпуска «{issue_id}» повторяется {count} раз(а)")
@@ -257,6 +299,11 @@ def main() -> int:
 
     if online:
         all_items = [item for issue in issues if isinstance(issue, dict) for item in issue.get("items", []) if isinstance(item, dict)]
+        # Записи «В этот день» проверяются как статьи: страница должна существовать.
+        all_items += [
+            {"id": f"days «{note.get('date')}»", "kind": "article", "wiki": note["wiki"]}
+            for note in days if isinstance(note, dict) and isinstance(note.get("wiki"), str)
+        ]
         try:
             check_online(all_items, errors, warnings)
         except Exception as exc:  # noqa: BLE001
@@ -271,6 +318,8 @@ def main() -> int:
     for message in errors:
         print(f"ОШИБКА: {message}")
 
+    if days:
+        print(f"\n«В этот день»: {len(days)} записей")
     print(
         f"\nВыпусков: {len(issues)} · рекомендаций: {sum(kinds_count.values())} "
         f"(картин {kinds_count['painting']}, статей {kinds_count['article']}, "

@@ -4,6 +4,7 @@ import android.content.Context
 import app.kvartet.data.Catalog
 import app.kvartet.data.CatalogLoader
 import app.kvartet.data.Completion
+import app.kvartet.data.DayNote
 import app.kvartet.data.DayPlanner
 import app.kvartet.data.Format
 import app.kvartet.data.Issue
@@ -80,6 +81,12 @@ object Kvartet {
     fun issueNumber(date: LocalDate): Int = ChronoUnit.DAYS.between(startDay, date).toInt() + 1
 
     fun item(id: String): Item? = itemsById[id]
+
+    /** «В этот день» для календарной даты (null — записи нет). */
+    fun dayNote(date: LocalDate): DayNote? {
+        val key = DayNote.key(date)
+        return catalog.days?.firstOrNull { it.date == key }
+    }
 
     fun issueContaining(item: Item): Issue? = issueByItemId[item.id]
 

@@ -30,6 +30,8 @@ struct Catalog: Codable {
     /// Дата обновления в формате "2026-10-20": из двух каталогов берётся более свежий.
     var updated: String?
     var issues: [Issue]
+    /// Рубрика «В этот день» (необязательная).
+    var days: [DayNote]?
 
     static let supportedSchemaVersion = 1
 }
