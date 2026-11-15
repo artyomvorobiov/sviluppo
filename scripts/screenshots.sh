@@ -73,6 +73,11 @@ film film-boyhood 12
 album album-bon-iver-for-emma 12
 article article-cage-4-33 6
 EOF
+  # Конец выпуска с рубрикой «В этот день».
+  xcrun simctl terminate "$UDID" "$BUNDLE" >/dev/null 2>&1 || true
+  sleep 1
+  xcrun simctl launch "$UDID" "$BUNDLE" -skipOnboarding -scrollToEnd >/dev/null </dev/null
+  shot widgets/day-note 14
   xcrun simctl ui "$UDID" appearance dark
   relaunch_with "kvartet://debug/widgets?item=film-boyhood"
   shot widgets/film-dark 10

@@ -26,16 +26,6 @@ struct IssueView: View {
                     streak: isToday ? model.currentStreak : 0
                 )
 
-                // «В этот день» привязано к календарю, а не к номеру выпуска.
-                if let note = model.library.dayNote(for: date) {
-                    Button {
-                        shownNote = note
-                    } label: {
-                        DayNoteCard(note: note)
-                    }
-                    .buttonStyle(.plain)
-                }
-
                 ForEach(items) { item in
                     NavigationLink(value: Route.item(item.id)) {
                         ItemCard(item: item)
@@ -49,12 +39,33 @@ struct IssueView: View {
                 if isToday {
                     IssueFooter(allDone: !items.isEmpty && doneCount == items.count)
                 }
+
+                // «В этот день» не связано с темой выпуска (оно привязано к календарю),
+                // поэтому стоит отдельным разделом после него.
+                if let note = model.library.dayNote(for: date) {
+                    VStack(alignment: .leading, spacing: 14) {
+                        Divider()
+                        VStack(alignment: .leading, spacing: 4) {
+                            SectionTitle("В этот день · \(Format.dayMonth(date))")
+                            Text("Вне темы выпуска: что случилось в этот день календаря.")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                        Button {
+                            shownNote = note
+                        } label: {
+                            DayNoteCard(note: note)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
             }
             .padding(.horizontal, 20)
             .padding(.top, 8)
             .padding(.bottom, 48)
         }
         .scrollIndicators(.hidden)
+        .defaultScrollAnchor(initialScrollAnchor)
         .background(Theme.paper.ignoresSafeArea())
         .navigationTitle(isToday ? "" : Format.dayMonth(date))
         .navigationBarTitleDisplayMode(.inline)
@@ -80,6 +91,14 @@ struct IssueView: View {
                 .environment(model)
         }
         .sensoryFeedback(.success, trigger: doneCount) { old, new in new > old }
+    }
+
+    /// Для автоматических скриншотов: запуск с аргументом -scrollToEnd показывает конец выпуска.
+    private var initialScrollAnchor: UnitPoint? {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-scrollToEnd") { return .bottom }
+        #endif
+        return nil
     }
 
     /// Настройки открываются только с экрана «Сегодня».

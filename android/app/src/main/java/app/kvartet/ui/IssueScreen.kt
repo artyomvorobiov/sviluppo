@@ -107,10 +107,6 @@ fun IssueScreen(
                 }
             }
         }
-        // «В этот день» привязано к календарю, а не к номеру выпуска.
-        dayNote?.let { note ->
-            item(key = "day-note") { DayNoteCard(note, onClick = { shownNote = note }) }
-        }
         items(items, key = { it.id }) { item ->
             ItemCard(item, isDone = item.id in done, onClick = { onOpenItem(item) })
         }
@@ -123,6 +119,21 @@ fun IssueScreen(
                 fontSize = 15.sp,
                 textAlign = TextAlign.Center,
             )
+        }
+        // «В этот день» не связано с темой выпуска (оно привязано к календарю),
+        // поэтому стоит отдельным разделом после него.
+        dayNote?.let { note ->
+            item(key = "day-note") {
+                Column {
+                    Box(Modifier.fillMaxWidth().height(1.dp).background(Palette.hairline))
+                    Spacer(Modifier.height(16.dp))
+                    SectionTitle("В этот день · ${Format.dayMonth(date)}")
+                    Spacer(Modifier.height(4.dp))
+                    Text("Вне темы выпуска: что случилось в этот день календаря.", color = Palette.muted, fontSize = 13.sp)
+                    Spacer(Modifier.height(12.dp))
+                    DayNoteCard(note, onClick = { shownNote = note })
+                }
+            }
         }
     }
 }
